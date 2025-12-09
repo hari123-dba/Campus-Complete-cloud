@@ -1,5 +1,5 @@
-
-import { supabase } from '../lib/supabase';
+import { db } from '../lib/firebase';
+import { collection, getDocs, addDoc, setDoc, doc, updateDoc, deleteDoc, query, where } from 'firebase/firestore';
 import { Competition, CompetitionStatus, Project, ProjectPhase, Announcement, UserRole, Team, User, College, UserStatus } from '../types';
 
 // --- MOCK SEED DATA (For Demo/Offline Mode) ---
@@ -68,7 +68,7 @@ const SEED_ANNOUNCEMENTS: Announcement[] = [
   { id: 'a2', title: 'Faculty Meeting', content: 'Discussing mid-term evaluations.', targetRole: UserRole.LECTURER, date: 'Oct 12' }
 ];
 
-// --- IN-MEMORY CACHE ---
+// --- IN-MEMORY CACHE (Acts as state store for the React App) ---
 let _users: User[] = [];
 let _colleges: College[] = [];
 let _competitions: Competition[] = [];
@@ -81,84 +81,57 @@ const saveToLocal = (key: string, data: any) => {
   localStorage.setItem(`cc_${key}`, JSON.stringify(data));
 };
 
-const mapProfileToUser = (p: any): User => ({
-  id: p.id,
-  firstName: p.first_name,
-  lastName: p.last_name,
-  name: `${p.first_name} ${p.last_name}`,
-  email: p.email,
-  role: p.role as UserRole,
-  avatar: p.avatar,
-  collegeId: p.college_id,
-  status: p.status as UserStatus,
-  uniqueId: p.unique_id,
-  phoneNumber: p.phone_number,
-  department: p.department,
-  academicBackground: p.academic_background,
-  academicYear: p.academic_year,
-  section: p.section
-});
-
-const mapUserToProfile = (u: Partial<User>) => ({
-  id: u.id,
-  first_name: u.firstName,
-  last_name: u.lastName,
-  email: u.email,
-  role: u.role,
-  avatar: u.avatar,
-  college_id: u.collegeId,
-  status: u.status,
-  unique_id: u.uniqueId,
-  phone_number: u.phoneNumber,
-  department: u.department,
-  academic_background: u.academicBackground,
-  academic_year: u.academicYear,
-  section: u.section
-});
-
 // --- INITIALIZATION ---
-
 export const initializeDatabase = async () => {
   console.log('Initializing Data Service...');
-  
-  // 1. Try Supabase First
-  let usedSupabase = false;
-  
-  if (supabase) {
+  let usedRemote = false;
+
+  // 1. Try Google Cloud Firestore
+  if (db) {
     try {
-      const { data: colleges, error: errCol } = await supabase.from('colleges').select('*');
-      if (!errCol && colleges) {
-        _colleges = colleges.map(c => ({ id: c.id, name: c.name, emailId: c.email_id, status: c.status }));
-        usedSupabase = true;
+      console.log('Connecting to Google Cloud Firestore...');
+      
+      const collegeSnap = await getDocs(collection(db, 'colleges'));
+      if (!collegeSnap.empty) {
+        _colleges = collegeSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as College));
+        usedRemote = true;
       }
-      
-      const { data: profiles } = await supabase.from('profiles').select('*');
-      if (profiles) _users = profiles.map(mapProfileToUser);
 
-      const { data: comps } = await supabase.from('competitions').select('*');
-      if (comps) _competitions = comps.map(c => ({
-         id: c.id, title: c.title, description: c.description, status: c.status as CompetitionStatus, date: c.date, participants: c.participants, bannerUrl: c.banner_url 
-      }));
+      const usersSnap = await getDocs(collection(db, 'users'));
+      if (!usersSnap.empty) {
+        _users = usersSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as User));
+      }
 
-      const { data: projs } = await supabase.from('projects').select('*');
-      if (projs) _projects = projs.map(p => ({
-         id: p.id, title: p.title, description: p.description, teamName: p.team_name, studentId: p.student_id, competitionId: p.competition_id, phase: p.phase as ProjectPhase, score: p.score, lastUpdated: p.last_updated
-      }));
-      
-      // Load other entities similarly...
-      
+      const compSnap = await getDocs(collection(db, 'competitions'));
+      if (!compSnap.empty) {
+        _competitions = compSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Competition));
+      }
+
+      const projSnap = await getDocs(collection(db, 'projects'));
+      if (!projSnap.empty) {
+        _projects = projSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Project));
+      }
+
+      const teamSnap = await getDocs(collection(db, 'teams'));
+      if (!teamSnap.empty) {
+        _teams = teamSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Team));
+      }
+
+      const annSnap = await getDocs(collection(db, 'announcements'));
+      if (!annSnap.empty) {
+        _announcements = annSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Announcement));
+      }
+
     } catch (err) {
-      console.warn('Supabase connection failed, falling back to LocalStorage', err);
+      console.warn('Google Cloud Firestore connection failed, falling back to LocalStorage', err);
     }
   }
 
-  // 2. Fallback to LocalStorage / Seed if Supabase didn't work or return data
-  if (!usedSupabase) {
+  // 2. Fallback to LocalStorage / Seed
+  if (!usedRemote) {
     console.log('Using LocalStorage/Seed Data');
-    
     const localColleges = localStorage.getItem('cc_colleges');
     
-    // Check if data exists AND is not an empty array (which would mean it was deleted/corrupted)
     if (localColleges && JSON.parse(localColleges).length > 0) {
       _colleges = JSON.parse(localColleges);
       _users = JSON.parse(localStorage.getItem('cc_users') || '[]');
@@ -186,6 +159,7 @@ export const initializeDatabase = async () => {
 
 
 // --- DATA ACCESSORS ---
+// Read operations mostly read from the in-memory cache populated by initializeDatabase
 
 export const getColleges = () => [..._colleges];
 export const getAllUsers = () => [..._users];
@@ -227,12 +201,12 @@ export const getPendingUsers = (approver: User): User[] => {
 };
 
 // --- MUTATIONS ---
+// Write operations update both Local Cache (for UI responsiveness) and Remote DB
 
 export const createTeam = async (name: string, user: User): Promise<Team> => {
   const teamId = `t${Date.now()}`;
   const code = Math.random().toString(36).substring(2, 8).toUpperCase();
   
-  // Update Cache
   const newTeam: Team = {
     id: teamId,
     name,
@@ -240,13 +214,18 @@ export const createTeam = async (name: string, user: User): Promise<Team> => {
     members: [{ userId: user.id, name: user.name, role: 'Leader', avatar: user.avatar }],
     projectIds: []
   };
+  
+  // Update Cache
   _teams = [..._teams, newTeam];
   saveToLocal('teams', _teams);
 
-  // Try DB
-  if (supabase) {
-    await supabase.from('teams').insert({ id: teamId, name, code, project_ids: [] });
-    await supabase.from('team_members').insert({ team_id: teamId, user_id: user.id, role: 'Leader', name: user.name, avatar: user.avatar });
+  // Update Cloud
+  if (db) {
+    try {
+      await setDoc(doc(db, 'teams', teamId), newTeam);
+    } catch (e) {
+      console.error("Cloud sync failed", e);
+    }
   }
   
   return newTeam;
@@ -266,10 +245,15 @@ export const joinTeam = async (code: string, user: User): Promise<Team> => {
   if (teamIndex !== -1) {
     _teams[teamIndex].members.push(newMember);
     saveToLocal('teams', _teams);
-  }
-
-  if (supabase) {
-    await supabase.from('team_members').insert({ team_id: team.id, user_id: user.id, role: 'Member', name: user.name, avatar: user.avatar });
+    
+    // Update Cloud
+    if (db) {
+        try {
+            await updateDoc(doc(db, 'teams', team.id), {
+                members: _teams[teamIndex].members
+            });
+        } catch (e) { console.error("Cloud sync failed", e); }
+    }
   }
 
   return _teams[teamIndex];
@@ -294,9 +278,10 @@ export const registerUser = async (userData: Partial<User>): Promise<User> => {
   _users = [..._users, newUser];
   saveToLocal('users', _users);
 
-  if (supabase) {
-    const dbProfile = mapUserToProfile(newUser);
-    await supabase.from('profiles').insert(dbProfile);
+  if (db) {
+    try {
+      await setDoc(doc(db, 'users', newId), newUser);
+    } catch (e) { console.error("Cloud sync failed", e); }
   }
   return newUser;
 };
@@ -307,10 +292,12 @@ export const approveUser = async (userId: string): Promise<void> => {
   if (index !== -1) {
     _users[index] = { ..._users[index], status: 'Active' };
     saveToLocal('users', _users);
-  }
-  
-  if (supabase) {
-    await supabase.from('profiles').update({ status: 'Active' }).eq('id', userId);
+    
+    if (db) {
+        try {
+          await updateDoc(doc(db, 'users', userId), { status: 'Active' });
+        } catch (e) { console.error("Cloud sync failed", e); }
+    }
   }
 };
 
@@ -319,10 +306,12 @@ export const rejectUser = async (userId: string): Promise<void> => {
   if (index !== -1) {
     _users[index] = { ..._users[index], status: 'Rejected' };
     saveToLocal('users', _users);
-  }
-
-  if (supabase) {
-    await supabase.from('profiles').update({ status: 'Rejected' }).eq('id', userId);
+    
+    if (db) {
+        try {
+          await updateDoc(doc(db, 'users', userId), { status: 'Rejected' });
+        } catch (e) { console.error("Cloud sync failed", e); }
+    }
   }
 };
 
@@ -337,8 +326,10 @@ export const addCollege = async (name: string, emailId: string): Promise<College
   _colleges = [..._colleges, newCollege];
   saveToLocal('colleges', _colleges);
 
-  if (supabase) {
-    await supabase.from('colleges').insert({ id: newCollege.id, name: newCollege.name, email_id: newCollege.emailId, status: newCollege.status });
+  if (db) {
+    try {
+      await setDoc(doc(db, 'colleges', newCollege.id), newCollege);
+    } catch (e) { console.error("Cloud sync failed", e); }
   }
   return newCollege;
 };
@@ -348,10 +339,12 @@ export const updateCollegeStatus = async (id: string, status: 'Active' | 'Suspen
   if (index !== -1) {
     _colleges[index] = { ..._colleges[index], status };
     saveToLocal('colleges', _colleges);
-  }
-
-  if (supabase) {
-    await supabase.from('colleges').update({ status }).eq('id', id);
+    
+    if (db) {
+        try {
+          await updateDoc(doc(db, 'colleges', id), { status });
+        } catch (e) { console.error("Cloud sync failed", e); }
+    }
   }
 };
 
@@ -359,8 +352,10 @@ export const removeCollege = async (id: string): Promise<void> => {
   _colleges = _colleges.filter(c => c.id !== id);
   saveToLocal('colleges', _colleges);
   
-  if (supabase) {
-    await supabase.from('colleges').delete().eq('id', id);
+  if (db) {
+      try {
+        await deleteDoc(doc(db, 'colleges', id));
+      } catch (e) { console.error("Cloud sync failed", e); }
   }
 };
 
