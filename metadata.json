@@ -1,0 +1,5 @@
+{
+  "name": "Campus Complete",
+  "description": "A comprehensive university competition and project management Progressive Web App (PWA). Features role-based access, project phase tracking, and offline-first hybrid authentication.",
+  "requestFramePermissions": []
+}
