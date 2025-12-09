@@ -157,7 +157,9 @@ export const initializeDatabase = async () => {
     console.log('Using LocalStorage/Seed Data');
     
     const localColleges = localStorage.getItem('cc_colleges');
-    if (localColleges) {
+    
+    // Check if data exists AND is not an empty array (which would mean it was deleted/corrupted)
+    if (localColleges && JSON.parse(localColleges).length > 0) {
       _colleges = JSON.parse(localColleges);
       _users = JSON.parse(localStorage.getItem('cc_users') || '[]');
       _competitions = JSON.parse(localStorage.getItem('cc_competitions') || '[]');
@@ -165,7 +167,8 @@ export const initializeDatabase = async () => {
       _announcements = JSON.parse(localStorage.getItem('cc_announcements') || '[]');
       _teams = JSON.parse(localStorage.getItem('cc_teams') || '[]');
     } else {
-      // Seed Data
+      // Auto-Recover / Seed Data
+      console.log('Data Missing or Empty. Re-seeding Defaults.');
       _colleges = SEED_COLLEGES;
       _users = SEED_USERS;
       _competitions = SEED_COMPETITIONS;
@@ -359,4 +362,9 @@ export const removeCollege = async (id: string): Promise<void> => {
   if (supabase) {
     await supabase.from('colleges').delete().eq('id', id);
   }
+};
+
+export const resetDatabase = () => {
+  localStorage.clear();
+  window.location.reload();
 };

@@ -27,11 +27,18 @@ export const login = async (email: string, role?: UserRole, collegeId?: string):
       return { user: null, error: 'Access to this institution has been temporarily suspended.' };
     }
 
+    // Check User Status with Context-Aware Feedback
     if (user.status === 'Pending') {
-      return { user: null, error: 'Account pending approval from Administrator.' };
+      let approverRole = 'Administrator';
+      if (user.role === UserRole.HOD) approverRole = 'College Principal';
+      if (user.role === UserRole.LECTURER) approverRole = 'Department HOD';
+      if (user.role === UserRole.STUDENT) approverRole = 'Department Lecturer';
+
+      return { user: null, error: `Account pending approval from ${approverRole}.` };
     }
+
     if (user.status === 'Rejected') {
-      return { user: null, error: 'Account access has been denied.' };
+      return { user: null, error: 'Account access has been denied by the institution.' };
     }
 
     localStorage.setItem('cc_session', JSON.stringify(user));

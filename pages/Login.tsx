@@ -1,9 +1,10 @@
+
 import React, { useState, useEffect } from 'react';
 import { UserRole, College } from '../types';
 import { RoleCard } from '../components/RoleCard';
 import { login } from '../services/authService';
-import { registerUser, getColleges } from '../services/dataService';
-import { Trophy, AlertCircle, Loader2, School, LogIn, UserPlus, Info } from 'lucide-react';
+import { registerUser, getColleges, resetDatabase } from '../services/dataService';
+import { Trophy, AlertCircle, Loader2, School, LogIn, UserPlus, Info, RefreshCw } from 'lucide-react';
 import { PWAInstallPrompt } from '../components/PWAInstallPrompt';
 import { DEPARTMENTS, ACADEMIC_YEARS } from '../constants';
 
@@ -43,10 +44,15 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
   useEffect(() => {
     const loadedColleges = getColleges();
     setColleges(loadedColleges);
+    
+    // Auto-select first college if data exists but selection is empty/invalid
     if (loadedColleges.length > 0) {
-      setSelectedCollege(loadedColleges[0].id);
+      const isValid = loadedColleges.find(c => c.id === selectedCollege);
+      if (!isValid || !selectedCollege) {
+        setSelectedCollege(loadedColleges[0].id);
+      }
     }
-  }, []);
+  }, [selectedCollege]); // Depend on selectedCollege to re-verify if needed
 
   // Reset messages on tab change
   useEffect(() => {
@@ -164,8 +170,23 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
           <p className="text-slate-500 text-center mt-1">Project & Competition Manager</p>
         </div>
 
+        {/* Fallback for Broken Data State */}
+        {colleges.length === 0 && (
+          <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-xl text-center">
+             <AlertCircle className="w-8 h-8 text-yellow-500 mx-auto mb-2" />
+             <h3 className="font-bold text-yellow-800 mb-1">System Data Missing</h3>
+             <p className="text-sm text-yellow-700 mb-3">No colleges detected. This can happen after a deployment or cache clear.</p>
+             <button 
+               onClick={resetDatabase}
+               className="px-4 py-2 bg-yellow-100 hover:bg-yellow-200 text-yellow-800 rounded-lg text-sm font-bold flex items-center justify-center gap-2 mx-auto transition-colors"
+             >
+               <RefreshCw size={14} /> Reset Demo Data
+             </button>
+          </div>
+        )}
+
         {/* College Selector (Global - Visible for Demo/Login) */}
-        {activeTab !== 'signup' && (
+        {colleges.length > 0 && activeTab !== 'signup' && (
           <div className="mb-6">
             <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 ml-1">Select Institution</label>
             <div className="relative">
