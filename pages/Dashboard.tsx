@@ -7,7 +7,7 @@ import {
 import { 
   Clock, TrendingUp, AlertCircle, CheckCircle2, UserCheck, XCircle, 
   School, UserPlus, X, Loader2, Shield, Users, Trophy, Award,
-  FileText, Activity, Settings, BarChart2, UserCog, Ban, Power, Trash2 
+  FileText, Activity, Settings, BarChart2, UserCog, Ban, Power, Trash2, Building2 
 } from 'lucide-react';
 import { DEPARTMENTS } from '../constants';
 
@@ -83,7 +83,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
       setModalMsg({ type: 'success', text: 'College added successfully.' });
       setNewCollegeForm({ name: '', emailId: '' });
       setCollegeList([...getColleges()]); // Refresh list
-      setTimeout(() => setShowAddCollegeModal(false), 1500);
+      setTimeout(() => {
+        setModalMsg(null);
+        setShowAddCollegeModal(false);
+      }, 1500);
     } catch (err: any) {
       setModalMsg({ type: 'error', text: err.message });
     } finally {
@@ -179,7 +182,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
           </div>
         </div>
 
-        {/* Pending Approvals Alert (Preserved functionality) */}
+        {/* Pending Approvals Alert */}
         {pendingUsers.length > 0 && (
           <div className="bg-white border border-yellow-200 bg-yellow-50/50 rounded-2xl p-6 shadow-sm animate-fade-in">
              <div className="flex items-center gap-2 mb-4">
@@ -256,12 +259,48 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
               <button className="flex items-center justify-center gap-2 p-4 bg-purple-50 text-purple-700 rounded-xl font-semibold hover:bg-purple-100 transition-colors">
                  <Trophy size={20} /> Competitions
               </button>
+              <button onClick={() => setShowAddCollegeModal(true)} className="flex items-center justify-center gap-2 p-4 bg-orange-50 text-orange-700 rounded-xl font-semibold hover:bg-orange-100 transition-colors">
+                 <School size={20} /> Add College
+              </button>
               <button className="flex items-center justify-center gap-2 p-4 bg-green-50 text-green-700 rounded-xl font-semibold hover:bg-green-100 transition-colors">
                  <BarChart2 size={20} /> Analytics
               </button>
-              <button className="flex items-center justify-center gap-2 p-4 bg-orange-50 text-orange-700 rounded-xl font-semibold hover:bg-orange-100 transition-colors">
-                 <Settings size={20} /> Settings
-              </button>
+           </div>
+        </div>
+
+        {/* Registered Institutions List */}
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
+           <div className="flex justify-between items-center mb-6">
+              <h3 className="font-medium text-slate-800">Registered Institutions</h3>
+              <span className="text-xs text-slate-500 font-medium bg-slate-100 px-2 py-1 rounded-lg">{collegeList.length} Total</span>
+           </div>
+           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {collegeList.map(college => (
+                <div key={college.id} className="flex justify-between items-center p-4 border border-slate-100 rounded-xl hover:bg-slate-50 transition-colors group">
+                    <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-indigo-50 text-indigo-600 rounded-lg flex items-center justify-center">
+                            <Building2 size={20} />
+                        </div>
+                        <div>
+                            <p className="font-semibold text-slate-800 text-sm">{college.name}</p>
+                            <p className="text-xs text-slate-500">@{college.emailId}</p>
+                        </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <span className={`text-[10px] font-bold px-2 py-1 rounded-full ${college.status === 'Active' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                            {college.status}
+                        </span>
+                        <div className="opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
+                          <button onClick={() => handleToggleCollegeStatus(college)} className="p-1.5 hover:bg-slate-200 rounded text-slate-500" title="Toggle Status">
+                            <Power size={14} />
+                          </button>
+                          <button onClick={() => handleRemoveCollege(college.id)} className="p-1.5 hover:bg-red-100 rounded text-red-500" title="Delete College">
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                    </div>
+                </div>
+              ))}
            </div>
         </div>
 
@@ -339,7 +378,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
            </div>
         </div>
 
-        {/* Modals remain same as original */}
+        {/* Add User Modal */}
         {showAddUserModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-fade-in">
             <div className="bg-white w-full max-w-md rounded-2xl shadow-xl p-6">
@@ -356,7 +395,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
                      <span>{modalMsg.text}</span>
                   </div>
                 )}
-                {/* Form fields same as before... simplified for this specific response context but included functionality */}
                  <div className="grid grid-cols-2 gap-4 mb-4">
                  <div>
                     <label className="block text-sm font-medium text-slate-700 mb-1">First Name</label>
@@ -403,6 +441,63 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
 
                 <button type="submit" disabled={isProcessing} className="w-full py-3 bg-slate-900 text-white rounded-xl">
                   {isProcessing ? <Loader2 className="animate-spin inline" /> : 'Create Account'}
+                </button>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* Add College Modal (New) */}
+        {showAddCollegeModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-fade-in">
+            <div className="bg-white w-full max-w-md rounded-2xl shadow-xl p-6">
+              <div className="flex justify-between items-center mb-6">
+                <h3 className="text-xl font-bold text-slate-800">Add College</h3>
+                <button onClick={() => setShowAddCollegeModal(false)} className="text-slate-400 hover:text-slate-600">
+                  <X size={24} />
+                </button>
+              </div>
+              <form onSubmit={handleAddCollege}>
+                {modalMsg && (
+                  <div className={`mb-4 p-3 rounded-lg flex items-center gap-2 text-sm ${modalMsg.type === 'error' ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-600'}`}>
+                     <AlertCircle size={16} />
+                     <span>{modalMsg.text}</span>
+                  </div>
+                )}
+                
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-slate-700 mb-1">College Name</label>
+                  <div className="relative">
+                    <School className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" />
+                    <input 
+                      type="text" 
+                      required
+                      className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 outline-none"
+                      placeholder="e.g. Springfield Institute of Technology"
+                      value={newCollegeForm.name}
+                      onChange={(e) => setNewCollegeForm({...newCollegeForm, name: e.target.value})}
+                    />
+                  </div>
+                </div>
+
+                <div className="mb-6">
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Email Domain</label>
+                  <p className="text-xs text-slate-400 mb-2">Used to identify users belonging to this college.</p>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold">@</span>
+                    <input 
+                      type="text" 
+                      required
+                      className="w-full pl-8 pr-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 outline-none"
+                      placeholder="springfield.edu"
+                      value={newCollegeForm.emailId}
+                      onChange={(e) => setNewCollegeForm({...newCollegeForm, emailId: e.target.value})}
+                    />
+                  </div>
+                </div>
+
+                <button type="submit" disabled={isProcessing} className="w-full py-3 bg-orange-600 hover:bg-orange-700 text-white font-bold rounded-xl flex items-center justify-center gap-2">
+                  {isProcessing ? <Loader2 className="animate-spin" /> : <><School size={18} /> Register College</>}
                 </button>
               </form>
             </div>

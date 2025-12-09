@@ -1,23 +1,62 @@
 {
+  "id": "/",
   "short_name": "CompeteHub",
   "name": "Campus Complete",
+  "description": "A comprehensive university competition and project management platform.",
   "icons": [
     {
       "src": "https://picsum.photos/192/192",
       "type": "image/png",
-      "sizes": "192x192"
+      "sizes": "192x192",
+      "purpose": "any"
+    },
+    {
+      "src": "https://picsum.photos/192/192",
+      "type": "image/png",
+      "sizes": "192x192",
+      "purpose": "maskable"
     },
     {
       "src": "https://picsum.photos/512/512",
       "type": "image/png",
-      "sizes": "512x512"
+      "sizes": "512x512",
+      "purpose": "any"
+    },
+    {
+      "src": "https://picsum.photos/512/512",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "maskable"
     }
   ],
-  "start_url": ".",
+  "screenshots": [
+    {
+      "src": "https://images.unsplash.com/photo-1531403009284-440f080d1e12?auto=format&fit=crop&w=1080&h=1920",
+      "sizes": "1080x1920",
+      "type": "image/jpeg",
+      "form_factor": "narrow",
+      "label": "Dashboard Overview"
+    },
+    {
+      "src": "https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&w=1080&h=1920",
+      "sizes": "1080x1920",
+      "type": "image/jpeg",
+      "form_factor": "narrow",
+      "label": "Team Collaboration"
+    },
+    {
+      "src": "https://images.unsplash.com/photo-1531403009284-440f080d1e12?auto=format&fit=crop&w=1920&h=1080",
+      "sizes": "1920x1080",
+      "type": "image/jpeg",
+      "form_factor": "wide",
+      "label": "Desktop Dashboard"
+    }
+  ],
+  "start_url": "/",
   "display": "standalone",
   "orientation": "portrait",
   "theme_color": "#0f172a",
   "background_color": "#ffffff",
-  "categories": ["education", "productivity"],
+  "categories": ["education", "productivity", "utilities"],
   "prefer_related_applications": false
 }
