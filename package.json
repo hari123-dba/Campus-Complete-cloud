@@ -15,8 +15,8 @@
     "react-router-dom": "^7.10.1",
     "framer-motion": "^12.23.25",
     "recharts": "^3.5.1",
-    "@supabase/supabase-js": "^2.87.0",
-    "firebase": "^12.6.0"
+    "firebase": "^12.6.0",
+    "date-fns": "^4.1.0"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",

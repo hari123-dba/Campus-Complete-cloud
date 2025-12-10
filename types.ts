@@ -38,7 +38,7 @@ export interface User {
   email: string;
   role: UserRole;
   avatar: string;
-  collegeId: string;
+  collegeId?: string; // Made optional for System Admins
   status: UserStatus;
   
   // Extended Profile Fields
@@ -95,6 +95,16 @@ export interface Announcement {
   content: string;
   targetRole: UserRole | 'All';
   date: string;
+}
+
+export interface ActivityLog {
+  id: string;
+  actorId: string;
+  actorName: string;
+  action: string;
+  details: string;
+  timestamp: string; // ISO String
+  type: 'info' | 'success' | 'warning' | 'error';
 }
 
 export interface AuthState {

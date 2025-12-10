@@ -8,11 +8,14 @@ export const login = async (email: string, role?: UserRole, collegeId?: string):
   const users = getAllUsers();
   const colleges = getColleges();
   
-  // Find user by email. If collegeId is provided (from dropdown), match that too.
+  // Find user by email.
   let user = users.find(u => u.email.toLowerCase() === email.toLowerCase());
 
-  if (collegeId && user && user.collegeId !== collegeId) {
-     return { user: null, error: 'User not found in this college.' };
+  // System Admin Bypass: Admins are not tied to a specific college for login
+  if (user && user.role !== UserRole.ADMIN) {
+     if (collegeId && user.collegeId !== collegeId) {
+        return { user: null, error: 'User not found in this college.' };
+     }
   }
 
   // If role is provided (Demo Login), ensure it matches
@@ -21,10 +24,12 @@ export const login = async (email: string, role?: UserRole, collegeId?: string):
   }
   
   if (user) {
-    // Check College Status
-    const userCollege = colleges.find(c => c.id === user?.collegeId);
-    if (userCollege && userCollege.status === 'Suspended') {
-      return { user: null, error: 'Access to this institution has been temporarily suspended.' };
+    // Check College Status (Skip for Admin)
+    if (user.role !== UserRole.ADMIN && user.collegeId) {
+        const userCollege = colleges.find(c => c.id === user?.collegeId);
+        if (userCollege && userCollege.status === 'Suspended') {
+          return { user: null, error: 'Access to this institution has been temporarily suspended.' };
+        }
     }
 
     // Check User Status with Context-Aware Feedback

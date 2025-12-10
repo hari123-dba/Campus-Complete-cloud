@@ -1,8 +1,7 @@
 import { initializeApp } from 'firebase/app';
-import { getFirestore } from 'firebase/firestore';
+import { getFirestore, enableMultiTabIndexedDbPersistence, initializeFirestore, CACHE_SIZE_UNLIMITED } from 'firebase/firestore';
 
 // Note: In a production environment, use process.env to populate these values.
-// For the purpose of this PWA, we attempt to connect, but will gracefully fail to local mode if keys are missing.
 const firebaseConfig = {
   apiKey: "YOUR_API_KEY_HERE", 
   authDomain: "campus-complete.firebaseapp.com",
@@ -19,8 +18,22 @@ try {
   // Simple check to see if the user has actually configured the keys
   if (firebaseConfig.apiKey !== "YOUR_API_KEY_HERE") {
     app = initializeApp(firebaseConfig);
-    db = getFirestore(app);
-    console.log("Firebase initialized successfully");
+    
+    // Initialize Firestore with settings for offline persistence
+    db = initializeFirestore(app, {
+      cacheSizeBytes: CACHE_SIZE_UNLIMITED
+    });
+
+    // Enable offline persistence
+    enableMultiTabIndexedDbPersistence(db).catch((err) => {
+      if (err.code == 'failed-precondition') {
+        console.warn('Persistence failed: Multiple tabs open.');
+      } else if (err.code == 'unimplemented') {
+        console.warn('Persistence is not available in this browser.');
+      }
+    });
+
+    console.log("Firebase initialized successfully with offline persistence");
   } else {
     console.warn("Firebase configuration missing. Running in Offline/Demo mode.");
   }

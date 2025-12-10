@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { User, UserRole, ProjectPhase, College } from '../types';
-import { getDataForUser, getPendingUsers, approveUser, rejectUser, registerUser, addCollege, getColleges, updateCollegeStatus, removeCollege, getAllUsers } from '../services/dataService';
+import { User, UserRole, ProjectPhase, College, ActivityLog } from '../types';
+import { getDataForUser, getPendingUsers, approveUser, rejectUser, registerUser, addCollege, getColleges, updateCollegeStatus, removeCollege, getAllUsers, getSystemLogs } from '../services/dataService';
 import { 
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell 
 } from 'recharts';
@@ -10,10 +10,28 @@ import {
   FileText, Activity, Settings, BarChart2, UserCog, Ban, Power, Trash2, Building2 
 } from 'lucide-react';
 import { DEPARTMENTS } from '../constants';
+import { formatDistanceToNow } from 'date-fns'; // Note: You might need to add date-fns if not present, but for now we'll implement simple time calc
 
 interface DashboardProps {
   user: User;
 }
+
+// Simple time helper
+const timeAgo = (dateStr: string) => {
+  const date = new Date(dateStr);
+  const seconds = Math.floor((new Date().getTime() - date.getTime()) / 1000);
+  let interval = seconds / 31536000;
+  if (interval > 1) return Math.floor(interval) + " years ago";
+  interval = seconds / 2592000;
+  if (interval > 1) return Math.floor(interval) + " months ago";
+  interval = seconds / 86400;
+  if (interval > 1) return Math.floor(interval) + " days ago";
+  interval = seconds / 3600;
+  if (interval > 1) return Math.floor(interval) + " hours ago";
+  interval = seconds / 60;
+  if (interval > 1) return Math.floor(interval) + " min ago";
+  return Math.floor(seconds) + " sec ago";
+};
 
 export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
   const { competitions, projects, announcements } = getDataForUser(user.id, user.role);
@@ -24,13 +42,14 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
   const [showAddUserModal, setShowAddUserModal] = useState(false);
   const [showAddCollegeModal, setShowAddCollegeModal] = useState(false);
   const [newUserForm, setNewUserForm] = useState({ 
-    firstName: '', lastName: '', email: '', uniqueId: '', phoneNumber: '', role: UserRole.STUDENT, department: '' 
+    firstName: '', lastName: '', email: '', uniqueId: '', phoneNumber: '', role: UserRole.STUDENT, department: '', collegeId: ''
   });
   const [newCollegeForm, setNewCollegeForm] = useState({ name: '', emailId: '' });
   
   // Admin: College Directory State
   const [collegeList, setCollegeList] = useState<College[]>([]);
   const [allSystemUsers, setAllSystemUsers] = useState<User[]>([]);
+  const [systemLogs, setSystemLogs] = useState<ActivityLog[]>([]);
   
   const [isProcessing, setIsProcessing] = useState(false);
   const [modalMsg, setModalMsg] = useState<{type: 'error' | 'success', text: string} | null>(null);
@@ -40,20 +59,19 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
     if (user.role === UserRole.ADMIN) {
       setCollegeList(getColleges());
       setAllSystemUsers(getAllUsers());
+      setSystemLogs(getSystemLogs());
     }
-  }, [user.role, pendingUsers]); // Update when pending users change (e.g. approved)
+  }, [user.role, pendingUsers, processedIds]); 
 
   // Fetch pending users based on Role Hierarchy
   useEffect(() => {
-    // All roles (except Student) have approval responsibilities
     if (user.role !== UserRole.STUDENT) {
       const updatePending = () => {
         const pending = getPendingUsers(user);
-        // Filter out processed IDs locally to update UI instantly before re-fetch or if fetch is static
         setPendingUsers(pending.filter(p => !processedIds.includes(p.id)));
+        if (user.role === UserRole.ADMIN) setSystemLogs(getSystemLogs());
       };
       updatePending();
-      // Poll every 5 seconds to keep dashboard synced
       const interval = setInterval(updatePending, 5000);
       return () => clearInterval(interval);
     }
@@ -62,15 +80,20 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
   const handleApprove = async (id: string) => {
     await approveUser(id);
     setProcessedIds(prev => [...prev, id]);
-    // Refresh admin data if needed
-    if (user.role === UserRole.ADMIN) setAllSystemUsers(getAllUsers());
+    if (user.role === UserRole.ADMIN) {
+      setAllSystemUsers(getAllUsers());
+      setSystemLogs(getSystemLogs());
+    }
   };
 
   const handleReject = async (id: string) => {
     if(window.confirm("Are you sure you want to reject this user?")) {
       await rejectUser(id);
       setProcessedIds(prev => [...prev, id]);
-       if (user.role === UserRole.ADMIN) setAllSystemUsers(getAllUsers());
+       if (user.role === UserRole.ADMIN) {
+         setAllSystemUsers(getAllUsers());
+         setSystemLogs(getSystemLogs());
+       }
     }
   };
 
@@ -82,7 +105,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
       await addCollege(newCollegeForm.name, newCollegeForm.emailId);
       setModalMsg({ type: 'success', text: 'College added successfully.' });
       setNewCollegeForm({ name: '', emailId: '' });
-      setCollegeList([...getColleges()]); // Refresh list
+      setCollegeList([...getColleges()]);
+      setSystemLogs(getSystemLogs());
       setTimeout(() => {
         setModalMsg(null);
         setShowAddCollegeModal(false);
@@ -97,33 +121,43 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
   const handleToggleCollegeStatus = async (college: College) => {
     const newStatus = college.status === 'Active' ? 'Suspended' : 'Active';
     await updateCollegeStatus(college.id, newStatus);
-    setCollegeList([...getColleges()]); // Refresh UI
+    setCollegeList([...getColleges()]);
+    setSystemLogs(getSystemLogs());
   };
 
   const handleRemoveCollege = async (id: string) => {
     if (window.confirm('Are you sure you want to permanently delete this college? All associated users may lose access.')) {
       await removeCollege(id);
-      setCollegeList([...getColleges()]); // Refresh UI
+      setCollegeList([...getColleges()]);
+      setSystemLogs(getSystemLogs());
     }
   };
 
   const handleAddUser = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Validate College ID for Admin users who must pick a target college
+    if (user.role === UserRole.ADMIN && !newUserForm.collegeId) {
+      setModalMsg({ type: 'error', text: 'Please select a college for this user.' });
+      return;
+    }
+
     setIsProcessing(true);
     setModalMsg(null);
     try {
-      // Admin manual add -> Auto Activate
       await registerUser({
         ...newUserForm,
-        collegeId: user.collegeId,
+        // If admin, use selected college. If not admin, use current user's college.
+        collegeId: user.role === UserRole.ADMIN ? newUserForm.collegeId : user.collegeId,
         status: 'Active'
       });
       setModalMsg({ type: 'success', text: `Successfully added ${newUserForm.firstName} to the system.` });
-      setNewUserForm({ firstName: '', lastName: '', email: '', uniqueId: '', phoneNumber: '', role: UserRole.STUDENT, department: '' });
+      setNewUserForm({ firstName: '', lastName: '', email: '', uniqueId: '', phoneNumber: '', role: UserRole.STUDENT, department: '', collegeId: '' });
       setTimeout(() => {
         setShowAddUserModal(false);
         setModalMsg(null);
         setAllSystemUsers(getAllUsers());
+        setSystemLogs(getSystemLogs());
       }, 2000);
     } catch (err: any) {
       setModalMsg({ type: 'error', text: err.message });
@@ -132,7 +166,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
     }
   };
 
-  // Quick Stats Calculation for non-admin
   const activeCompetitions = competitions.filter(c => c.status === 'Ongoing').length;
   const pendingProjects = projects.filter(p => p.phase !== ProjectPhase.IMPLEMENTATION).length;
   
@@ -156,20 +189,16 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
     </div>
   );
 
-  // --- RENDER ADMIN DASHBOARD ---
   if (user.role === UserRole.ADMIN) {
-    // Admin Specific Calculations
     const totalUsers = allSystemUsers.length;
     const studentCount = allSystemUsers.filter(u => u.role === UserRole.STUDENT).length;
     const lecturerCount = allSystemUsers.filter(u => u.role === UserRole.LECTURER).length;
     const hodCount = allSystemUsers.filter(u => u.role === UserRole.HOD).length;
     const principalCount = allSystemUsers.filter(u => u.role === UserRole.PRINCIPAL).length;
-
     const getPercent = (count: number) => totalUsers > 0 ? Math.round((count / totalUsers) * 100) : 0;
 
     return (
       <div className="space-y-6 animate-fade-in relative pb-20">
-        {/* Red Header Card */}
         <div className="bg-gradient-to-r from-red-600 to-red-700 rounded-2xl p-8 text-white shadow-lg shadow-red-200">
           <div className="flex items-start gap-4">
              <div className="p-3 bg-white/10 rounded-xl backdrop-blur-sm">
@@ -182,7 +211,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
           </div>
         </div>
 
-        {/* Pending Approvals Alert */}
         {pendingUsers.length > 0 && (
           <div className="bg-white border border-yellow-200 bg-yellow-50/50 rounded-2xl p-6 shadow-sm animate-fade-in">
              <div className="flex items-center gap-2 mb-4">
@@ -217,39 +245,13 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
           </div>
         )}
 
-        {/* Stats Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-           <StatCard 
-             title="Total Users" 
-             value={totalUsers.toLocaleString()} 
-             icon={Users} 
-             color="bg-blue-600"
-             trend="+12%"
-           />
-           <StatCard 
-             title="Active Competitions" 
-             value={activeCompetitions} 
-             icon={Award} 
-             color="bg-purple-600"
-             trend="+3"
-           />
-           <StatCard 
-             title="Total Projects" 
-             value={projects.length} 
-             icon={FileText} 
-             color="bg-green-600"
-             trend="+28%"
-           />
-           <StatCard 
-             title="System Health" 
-             value="98%" 
-             icon={Activity} 
-             color="bg-orange-500"
-             trendLabel="Good"
-           />
+           <StatCard title="Total Users" value={totalUsers.toLocaleString()} icon={Users} color="bg-blue-600" trend="+12%" />
+           <StatCard title="Active Competitions" value={activeCompetitions} icon={Award} color="bg-purple-600" trend="+3" />
+           <StatCard title="Total Projects" value={projects.length} icon={FileText} color="bg-green-600" trend="+28%" />
+           <StatCard title="System Health" value="98%" icon={Activity} color="bg-orange-500" trendLabel="Good" />
         </div>
 
-        {/* Admin Actions */}
         <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
            <h3 className="font-medium text-slate-800 mb-4">Admin Actions</h3>
            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -268,7 +270,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
            </div>
         </div>
 
-        {/* Registered Institutions List */}
         <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
            <div className="flex justify-between items-center mb-6">
               <h3 className="font-medium text-slate-800">Registered Institutions</h3>
@@ -304,9 +305,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
            </div>
         </div>
 
-        {/* Users by Role & Activity */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-           {/* Users by Role */}
            <div className="lg:col-span-2 bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
               <h3 className="font-medium text-slate-800 mb-6">Users by Role</h3>
               <div className="space-y-6">
@@ -349,36 +348,28 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
               </div>
            </div>
 
-           {/* Recent System Activities */}
-           <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
-              <h3 className="font-medium text-slate-800 mb-6">Recent System Activities</h3>
+           <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6 overflow-hidden">
+              <h3 className="font-medium text-slate-800 mb-6">Real-Time Activity Log</h3>
               <div className="relative pl-4 space-y-6 before:absolute before:left-0 before:top-2 before:bottom-2 before:w-0.5 before:bg-slate-100">
-                 {/* Mock Activity Data based on Image */}
-                 <div className="relative">
-                    <span className="absolute -left-[21px] top-1 w-3 h-3 rounded-full bg-blue-500 border-2 border-white"></span>
-                    <p className="text-sm font-medium text-slate-800">New user registered</p>
-                    <p className="text-xs text-slate-500 mt-0.5">Emma Watson • 5 min ago</p>
-                 </div>
-                 <div className="relative">
-                    <span className="absolute -left-[21px] top-1 w-3 h-3 rounded-full bg-purple-500 border-2 border-white"></span>
-                    <p className="text-sm font-medium text-slate-800">Competition created</p>
-                    <p className="text-xs text-slate-500 mt-0.5">Admin • 15 min ago</p>
-                 </div>
-                 <div className="relative">
-                    <span className="absolute -left-[21px] top-1 w-3 h-3 rounded-full bg-green-500 border-2 border-white"></span>
-                    <p className="text-sm font-medium text-slate-800">Project submitted</p>
-                    <p className="text-xs text-slate-500 mt-0.5">John Doe • 1 hour ago</p>
-                 </div>
-                  <div className="relative">
-                    <span className="absolute -left-[21px] top-1 w-3 h-3 rounded-full bg-orange-500 border-2 border-white"></span>
-                    <p className="text-sm font-medium text-slate-800">System backup completed</p>
-                    <p className="text-xs text-slate-500 mt-0.5">System • 3 hours ago</p>
-                 </div>
+                 {systemLogs.length === 0 && (
+                   <div className="text-xs text-slate-400 italic">No activity logs recorded.</div>
+                 )}
+                 {systemLogs.map((log) => (
+                    <div key={log.id} className="relative">
+                      <span className={`absolute -left-[21px] top-1 w-3 h-3 rounded-full border-2 border-white ${
+                        log.type === 'error' ? 'bg-red-500' :
+                        log.type === 'warning' ? 'bg-orange-500' :
+                        log.type === 'success' ? 'bg-green-500' : 'bg-blue-500'
+                      }`}></span>
+                      <p className="text-sm font-medium text-slate-800">{log.action.replace('_', ' ')}</p>
+                      <p className="text-xs text-slate-600">{log.details}</p>
+                      <p className="text-[10px] text-slate-400 mt-0.5">{log.actorName} • {timeAgo(log.timestamp)}</p>
+                    </div>
+                 ))}
               </div>
            </div>
         </div>
 
-        {/* Add User Modal */}
         {showAddUserModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-fade-in">
             <div className="bg-white w-full max-w-md rounded-2xl shadow-xl p-6">
@@ -408,17 +399,31 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
                  </div>
               </div>
 
+              {/* Admin requires selecting the college */}
+              {user.role === UserRole.ADMIN && (
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Target College</label>
+                  <div className="relative">
+                    <School className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" />
+                    <select 
+                      value={newUserForm.collegeId} 
+                      onChange={(e) => setNewUserForm({...newUserForm, collegeId: e.target.value})}
+                      className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 bg-white focus:ring-2 focus:ring-blue-500 outline-none"
+                    >
+                      <option value="">Select Institution</option>
+                      {collegeList.map(c => (
+                        <option key={c.id} value={c.id}>{c.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              )}
+
               <div className="mb-4">
                 <label className="block text-sm font-medium text-slate-700 mb-1">Email Address</label>
-                <input 
-                  type="email" 
-                  required
-                  className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 outline-none"
-                  value={newUserForm.email}
-                  onChange={(e) => setNewUserForm({...newUserForm, email: e.target.value})}
-                />
+                <input type="email" required className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 outline-none"
+                  value={newUserForm.email} onChange={(e) => setNewUserForm({...newUserForm, email: e.target.value})} />
               </div>
-
               <div className="grid grid-cols-2 gap-4 mb-4">
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">Unique ID</label>
@@ -427,19 +432,15 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
                 </div>
                 <div>
                    <label className="block text-sm font-medium text-slate-700 mb-1">Role</label>
-                   <select 
-                     value={newUserForm.role}
-                     onChange={(e) => setNewUserForm({...newUserForm, role: e.target.value as UserRole})}
-                     className="w-full px-4 py-2 rounded-xl border border-slate-200 bg-white outline-none"
-                   >
+                   <select value={newUserForm.role} onChange={(e) => setNewUserForm({...newUserForm, role: e.target.value as UserRole})}
+                     className="w-full px-4 py-2 rounded-xl border border-slate-200 bg-white outline-none">
                      {Object.values(UserRole).filter(r => r !== UserRole.ADMIN).map(role => (
                        <option key={role} value={role}>{role}</option>
                      ))}
                    </select>
                 </div>
               </div>
-
-                <button type="submit" disabled={isProcessing} className="w-full py-3 bg-slate-900 text-white rounded-xl">
+              <button type="submit" disabled={isProcessing} className="w-full py-3 bg-slate-900 text-white rounded-xl">
                   {isProcessing ? <Loader2 className="animate-spin inline" /> : 'Create Account'}
                 </button>
               </form>
@@ -447,7 +448,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
           </div>
         )}
 
-        {/* Add College Modal (New) */}
         {showAddCollegeModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-fade-in">
             <div className="bg-white w-full max-w-md rounded-2xl shadow-xl p-6">
@@ -464,38 +464,24 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
                      <span>{modalMsg.text}</span>
                   </div>
                 )}
-                
                 <div className="mb-4">
                   <label className="block text-sm font-medium text-slate-700 mb-1">College Name</label>
                   <div className="relative">
                     <School className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" />
-                    <input 
-                      type="text" 
-                      required
-                      className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 outline-none"
+                    <input type="text" required className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 outline-none"
                       placeholder="e.g. Springfield Institute of Technology"
-                      value={newCollegeForm.name}
-                      onChange={(e) => setNewCollegeForm({...newCollegeForm, name: e.target.value})}
-                    />
+                      value={newCollegeForm.name} onChange={(e) => setNewCollegeForm({...newCollegeForm, name: e.target.value})} />
                   </div>
                 </div>
-
                 <div className="mb-6">
                   <label className="block text-sm font-medium text-slate-700 mb-1">Email Domain</label>
                   <p className="text-xs text-slate-400 mb-2">Used to identify users belonging to this college.</p>
                   <div className="relative">
                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold">@</span>
-                    <input 
-                      type="text" 
-                      required
-                      className="w-full pl-8 pr-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 outline-none"
-                      placeholder="springfield.edu"
-                      value={newCollegeForm.emailId}
-                      onChange={(e) => setNewCollegeForm({...newCollegeForm, emailId: e.target.value})}
-                    />
+                    <input type="text" required className="w-full pl-8 pr-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 outline-none"
+                      placeholder="springfield.edu" value={newCollegeForm.emailId} onChange={(e) => setNewCollegeForm({...newCollegeForm, emailId: e.target.value})} />
                   </div>
                 </div>
-
                 <button type="submit" disabled={isProcessing} className="w-full py-3 bg-orange-600 hover:bg-orange-700 text-white font-bold rounded-xl flex items-center justify-center gap-2">
                   {isProcessing ? <Loader2 className="animate-spin" /> : <><School size={18} /> Register College</>}
                 </button>
@@ -507,7 +493,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
     );
   }
 
-  // --- RENDER STANDARD DASHBOARD (Principal, HOD, Lecturer, Student) ---
   return (
     <div className="space-y-6 animate-fade-in relative pb-20">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { UserRole, College } from '../types';
 import { RoleCard } from '../components/RoleCard';
@@ -61,7 +60,8 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
   }, [activeTab, selectedCollege]);
 
   const handleDemoLogin = async (role: UserRole, email: string) => {
-    if (selectedCollege !== 'col_1') {
+    // Restrict demo login to the Demo University, unless it is the System Admin who is global
+    if (role !== UserRole.ADMIN && selectedCollege !== 'col_1') {
       setError('Quick Demo is only available for "Campus Complete Demo Univ"');
       return;
     }
@@ -245,7 +245,7 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
           <div className="space-y-4 animate-fade-in">
              <div className="text-center mb-4">
               <p className="text-xs text-slate-400">
-                {selectedCollege === 'col_1' ? 'Tap any role below to auto-fill credentials' : 'Switch to "Campus Complete Demo Univ" for quick access'}
+                {selectedCollege === 'col_1' ? 'Tap any role below to auto-fill credentials' : 'Switch to "Campus Complete Demo Univ" for quick access (Admin is global)'}
               </p>
             </div>
             {(Object.values(UserRole) as UserRole[]).map((role) => (
@@ -253,7 +253,7 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
                 key={role} 
                 role={role} 
                 onClick={handleDemoLogin}
-                isLoading={isLoading || selectedCollege !== 'col_1'}
+                isLoading={isLoading || (selectedCollege !== 'col_1' && role !== UserRole.ADMIN)}
               />
             ))}
           </div>

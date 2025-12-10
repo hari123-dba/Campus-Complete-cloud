@@ -1,6 +1,6 @@
 import { db } from '../lib/firebase';
-import { collection, getDocs, addDoc, setDoc, doc, updateDoc, deleteDoc, query, where } from 'firebase/firestore';
-import { Competition, CompetitionStatus, Project, ProjectPhase, Announcement, UserRole, Team, User, College, UserStatus } from '../types';
+import { collection, getDocs, addDoc, setDoc, doc, updateDoc, deleteDoc, query, where, orderBy, limit } from 'firebase/firestore';
+import { Competition, CompetitionStatus, Project, ProjectPhase, Announcement, UserRole, Team, User, College, UserStatus, ActivityLog } from '../types';
 
 // --- MOCK SEED DATA (For Demo/Offline Mode) ---
 const SEED_COLLEGES: College[] = [
@@ -13,7 +13,8 @@ const SEED_USERS: User[] = [
   { 
     id: 'u_admin', firstName: 'System', lastName: 'Admin', name: 'System Admin', 
     email: 'admin@campus.edu', role: UserRole.ADMIN, avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Admin', 
-    collegeId: 'col_1', status: 'Active', uniqueId: 'ADM001', phoneNumber: '555-0100' 
+    status: 'Active', uniqueId: 'ADM001', phoneNumber: '555-0100' 
+    // Admin is now autonomous (no collegeId)
   },
   { 
     id: 'u_princ', firstName: 'Principal', lastName: 'Skinner', name: 'Principal Skinner', 
@@ -75,10 +76,38 @@ let _competitions: Competition[] = [];
 let _projects: Project[] = [];
 let _announcements: Announcement[] = [];
 let _teams: Team[] = [];
+let _logs: ActivityLog[] = [];
 
 // --- HELPERS ---
 const saveToLocal = (key: string, data: any) => {
   localStorage.setItem(`cc_${key}`, JSON.stringify(data));
+};
+
+const logActivity = async (actor: User | null, action: string, details: string, type: 'info' | 'success' | 'warning' | 'error' = 'info') => {
+  const newLog: ActivityLog = {
+    id: `log_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+    actorId: actor?.id || 'system',
+    actorName: actor?.name || 'System',
+    action,
+    details,
+    timestamp: new Date().toISOString(),
+    type
+  };
+
+  // Update Cache
+  _logs = [newLog, ..._logs];
+  // Keep local cache manageable
+  if (_logs.length > 50) _logs = _logs.slice(0, 50);
+  saveToLocal('logs', _logs);
+
+  // Update Cloud
+  if (db) {
+    try {
+      await addDoc(collection(db, 'system_logs'), newLog);
+    } catch (e) {
+      console.error("Failed to push log to cloud", e);
+    }
+  }
 };
 
 // --- INITIALIZATION ---
@@ -122,6 +151,13 @@ export const initializeDatabase = async () => {
         _announcements = annSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Announcement));
       }
 
+      // Fetch recent logs
+      const q = query(collection(db, 'system_logs'), orderBy('timestamp', 'desc'), limit(20));
+      const logSnap = await getDocs(q);
+      if (!logSnap.empty) {
+        _logs = logSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as ActivityLog));
+      }
+
     } catch (err) {
       console.warn('Google Cloud Firestore connection failed, falling back to LocalStorage', err);
     }
@@ -139,6 +175,7 @@ export const initializeDatabase = async () => {
       _projects = JSON.parse(localStorage.getItem('cc_projects') || '[]');
       _announcements = JSON.parse(localStorage.getItem('cc_announcements') || '[]');
       _teams = JSON.parse(localStorage.getItem('cc_teams') || '[]');
+      _logs = JSON.parse(localStorage.getItem('cc_logs') || '[]');
     } else {
       // Auto-Recover / Seed Data
       console.log('Data Missing or Empty. Re-seeding Defaults.');
@@ -153,16 +190,18 @@ export const initializeDatabase = async () => {
       saveToLocal('competitions', _competitions);
       saveToLocal('projects', _projects);
       saveToLocal('announcements', _announcements);
+      
+      // Log initialization
+      logActivity(null, 'SYSTEM_INIT', 'Database seeded with default values.', 'info');
     }
   }
 };
 
 
 // --- DATA ACCESSORS ---
-// Read operations mostly read from the in-memory cache populated by initializeDatabase
-
 export const getColleges = () => [..._colleges];
 export const getAllUsers = () => [..._users];
+export const getSystemLogs = () => [..._logs];
 
 export const getDataForUser = (userId: string, role: UserRole) => {
   return {
@@ -170,7 +209,9 @@ export const getDataForUser = (userId: string, role: UserRole) => {
     projects: role === UserRole.STUDENT 
       ? _projects.filter(p => p.studentId === userId) 
       : [..._projects],
-    announcements: _announcements.filter(a => a.targetRole === 'All' || a.targetRole === role)
+    announcements: role === UserRole.ADMIN 
+      ? [..._announcements] // Admins see all announcements
+      : _announcements.filter(a => a.targetRole === 'All' || a.targetRole === role)
   };
 };
 
@@ -180,6 +221,7 @@ export const getUserTeams = (userId: string): Team[] => {
 
 export const getPendingUsers = (approver: User): User[] => {
   if (approver.role === UserRole.ADMIN) {
+    // Admin approves all Principals regardless of college
     return _users.filter(u => u.role === UserRole.PRINCIPAL && u.status === 'Pending');
   }
   if (approver.role === UserRole.PRINCIPAL) {
@@ -201,7 +243,6 @@ export const getPendingUsers = (approver: User): User[] => {
 };
 
 // --- MUTATIONS ---
-// Write operations update both Local Cache (for UI responsiveness) and Remote DB
 
 export const createTeam = async (name: string, user: User): Promise<Team> => {
   const teamId = `t${Date.now()}`;
@@ -215,18 +256,16 @@ export const createTeam = async (name: string, user: User): Promise<Team> => {
     projectIds: []
   };
   
-  // Update Cache
   _teams = [..._teams, newTeam];
   saveToLocal('teams', _teams);
 
-  // Update Cloud
   if (db) {
     try {
       await setDoc(doc(db, 'teams', teamId), newTeam);
-    } catch (e) {
-      console.error("Cloud sync failed", e);
-    }
+    } catch (e) { console.error("Cloud sync failed", e); }
   }
+
+  await logActivity(user, 'TEAM_CREATE', `Created new team "${name}" (Code: ${code})`, 'success');
   
   return newTeam;
 };
@@ -246,7 +285,6 @@ export const joinTeam = async (code: string, user: User): Promise<Team> => {
     _teams[teamIndex].members.push(newMember);
     saveToLocal('teams', _teams);
     
-    // Update Cloud
     if (db) {
         try {
             await updateDoc(doc(db, 'teams', team.id), {
@@ -256,15 +294,19 @@ export const joinTeam = async (code: string, user: User): Promise<Team> => {
     }
   }
 
+  await logActivity(user, 'TEAM_JOIN', `Joined team "${team.name}"`, 'success');
+
   return _teams[teamIndex];
 };
 
 
 export const registerUser = async (userData: Partial<User>): Promise<User> => {
-  if (!userData.email || !userData.collegeId || !userData.role) throw new Error("Missing required fields");
+  if (!userData.email || !userData.role) throw new Error("Missing required fields");
+  // CollegeId is optional for Admin, required for others
+  if (userData.role !== UserRole.ADMIN && !userData.collegeId) throw new Error("College ID is required");
 
   const existing = _users.find(u => u.email.toLowerCase() === userData.email?.toLowerCase() && u.collegeId === userData.collegeId);
-  if (existing) throw new Error(`Email ${userData.email} is already registered in this college.`);
+  if (existing) throw new Error(`Email ${userData.email} is already registered.`);
 
   const newId = `u${Date.now()}`;
   const newUser = {
@@ -283,6 +325,9 @@ export const registerUser = async (userData: Partial<User>): Promise<User> => {
       await setDoc(doc(db, 'users', newId), newUser);
     } catch (e) { console.error("Cloud sync failed", e); }
   }
+
+  await logActivity(null, 'USER_REGISTER', `New registration: ${newUser.name} (${newUser.role})`, 'info');
+
   return newUser;
 };
 
@@ -290,7 +335,8 @@ export const registerUser = async (userData: Partial<User>): Promise<User> => {
 export const approveUser = async (userId: string): Promise<void> => {
   const index = _users.findIndex(u => u.id === userId);
   if (index !== -1) {
-    _users[index] = { ..._users[index], status: 'Active' };
+    const user = _users[index];
+    _users[index] = { ...user, status: 'Active' };
     saveToLocal('users', _users);
     
     if (db) {
@@ -298,13 +344,16 @@ export const approveUser = async (userId: string): Promise<void> => {
           await updateDoc(doc(db, 'users', userId), { status: 'Active' });
         } catch (e) { console.error("Cloud sync failed", e); }
     }
+
+    await logActivity(null, 'USER_APPROVE', `Approved access for ${user.name}`, 'success');
   }
 };
 
 export const rejectUser = async (userId: string): Promise<void> => {
   const index = _users.findIndex(u => u.id === userId);
   if (index !== -1) {
-    _users[index] = { ..._users[index], status: 'Rejected' };
+    const user = _users[index];
+    _users[index] = { ...user, status: 'Rejected' };
     saveToLocal('users', _users);
     
     if (db) {
@@ -312,6 +361,8 @@ export const rejectUser = async (userId: string): Promise<void> => {
           await updateDoc(doc(db, 'users', userId), { status: 'Rejected' });
         } catch (e) { console.error("Cloud sync failed", e); }
     }
+
+    await logActivity(null, 'USER_REJECT', `Rejected access for ${user.name}`, 'warning');
   }
 };
 
@@ -331,13 +382,17 @@ export const addCollege = async (name: string, emailId: string): Promise<College
       await setDoc(doc(db, 'colleges', newCollege.id), newCollege);
     } catch (e) { console.error("Cloud sync failed", e); }
   }
+
+  await logActivity(null, 'COLLEGE_ADD', `Added new institution: ${name}`, 'success');
+
   return newCollege;
 };
 
 export const updateCollegeStatus = async (id: string, status: 'Active' | 'Suspended'): Promise<void> => {
   const index = _colleges.findIndex(c => c.id === id);
   if (index !== -1) {
-    _colleges[index] = { ..._colleges[index], status };
+    const college = _colleges[index];
+    _colleges[index] = { ...college, status };
     saveToLocal('colleges', _colleges);
     
     if (db) {
@@ -345,10 +400,13 @@ export const updateCollegeStatus = async (id: string, status: 'Active' | 'Suspen
           await updateDoc(doc(db, 'colleges', id), { status });
         } catch (e) { console.error("Cloud sync failed", e); }
     }
+
+    await logActivity(null, 'COLLEGE_STATUS', `Changed status of ${college.name} to ${status}`, 'warning');
   }
 };
 
 export const removeCollege = async (id: string): Promise<void> => {
+  const college = _colleges.find(c => c.id === id);
   _colleges = _colleges.filter(c => c.id !== id);
   saveToLocal('colleges', _colleges);
   
@@ -357,6 +415,8 @@ export const removeCollege = async (id: string): Promise<void> => {
         await deleteDoc(doc(db, 'colleges', id));
       } catch (e) { console.error("Cloud sync failed", e); }
   }
+
+  await logActivity(null, 'COLLEGE_REMOVE', `Removed institution: ${college?.name}`, 'error');
 };
 
 export const resetDatabase = () => {

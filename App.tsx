@@ -17,7 +17,7 @@ function App() {
 
   useEffect(() => {
     const init = async () => {
-      // Initialize Supabase Database (Fetch Data)
+      // Initialize Database (Fetch Data)
       await initializeDatabase();
 
       const sessionUser = getSession();
