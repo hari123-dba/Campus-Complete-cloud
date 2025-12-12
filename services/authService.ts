@@ -1,7 +1,7 @@
 import { User, UserRole } from '../types';
 import { getAllUsers, getColleges } from './dataService';
 import { auth } from '../lib/firebase';
-import { signInWithEmailAndPassword, createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
+import { signInWithEmailAndPassword, createUserWithEmailAndPassword, updateProfile, sendEmailVerification, signOut, sendPasswordResetEmail, GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
 
 export const login = async (email: string, role?: UserRole, collegeId?: string): Promise<{ user: User | null; error: string | null }> => {
   // MOCK LOGIN STRATEGY (For Demo Mode)
@@ -36,6 +36,12 @@ export const firebaseLogin = async (email: string, password: string): Promise<{ 
     try {
         const userCredential = await signInWithEmailAndPassword(auth, email, password);
         const fbUser = userCredential.user;
+
+        // Check for Email Verification
+        if (!fbUser.emailVerified) {
+            await signOut(auth);
+            return { user: null, error: "Email not verified. Please check your inbox." };
+        }
         
         // Construct a generic User object since we aren't fetching full profile from DB
         const appUser: any = {
@@ -64,6 +70,35 @@ export const firebaseLogin = async (email: string, password: string): Promise<{ 
     }
 };
 
+export const signInWithGoogle = async (): Promise<{ user: any | null; error: string | null }> => {
+    try {
+        const provider = new GoogleAuthProvider();
+        const result = await signInWithPopup(auth, provider);
+        const fbUser = result.user;
+        
+        // Construct generic user object
+        // Note: In a real app, you might check Firestore to see if this user already has a role assigned.
+        // Here we default to Student.
+        const appUser: any = {
+            id: fbUser.uid,
+            name: fbUser.displayName || fbUser.email?.split('@')[0],
+            email: fbUser.email,
+            role: UserRole.STUDENT, 
+            avatar: fbUser.photoURL || `https://api.dicebear.com/7.x/avataaars/svg?seed=${fbUser.uid}`,
+            status: 'Active',
+            collegeId: 'col_1'
+        };
+
+        // Persist session
+        localStorage.setItem('cc_session', JSON.stringify(appUser));
+        return { user: appUser, error: null };
+
+    } catch (error: any) {
+        console.error("Google Sign In Error", error);
+        return { user: null, error: error.message };
+    }
+};
+
 export const firebaseSignup = async (email: string, password: string, name: string): Promise<{ user: any | null; error: string | null }> => {
     try {
         const userCredential = await createUserWithEmailAndPassword(auth, email, password);
@@ -73,21 +108,17 @@ export const firebaseSignup = async (email: string, password: string, name: stri
             await updateProfile(auth.currentUser, {
                 displayName: name
             });
+            // Send Verification Email
+            await sendEmailVerification(auth.currentUser);
+            // Sign out immediately to prevent auto-login before verification
+            await signOut(auth);
         }
 
-        const fbUser = userCredential.user;
+        // Return a partial user object to indicate success to the caller
         const appUser: any = {
-            id: fbUser.uid,
-            name: name,
-            email: fbUser.email || email,
-            role: UserRole.STUDENT,
-            avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${fbUser.uid}`,
-            status: 'Active',
-            collegeId: 'col_1'
+            email: email,
+            name: name
         };
-
-        // Persist session
-        localStorage.setItem('cc_session', JSON.stringify(appUser));
 
         return { user: appUser, error: null };
     } catch (error: any) {
@@ -99,6 +130,22 @@ export const firebaseSignup = async (email: string, password: string, name: stri
             errorMessage = error.message;
         }
         return { user: null, error: errorMessage };
+    }
+};
+
+export const sendPasswordReset = async (email: string): Promise<{ success: boolean; error: string | null }> => {
+    try {
+        await sendPasswordResetEmail(auth, email);
+        return { success: true, error: null };
+    } catch (error: any) {
+        console.error("Reset Password Error:", error.code);
+        let errorMessage = "Failed to send reset email.";
+        if (error.code === 'auth/invalid-email') {
+            errorMessage = "Invalid email address.";
+        } else if (error.code === 'auth/user-not-found') {
+            errorMessage = "User not found.";
+        }
+        return { success: false, error: errorMessage };
     }
 };
 

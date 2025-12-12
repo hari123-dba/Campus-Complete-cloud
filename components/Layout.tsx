@@ -50,9 +50,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
       {/* Mobile Header */}
       <div className="fixed top-0 left-0 right-0 h-16 bg-white z-30 border-b border-slate-200 flex items-center justify-between px-4 md:hidden pt-safe">
         <div className="flex items-center gap-2">
-           <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
-             <Trophy className="text-white w-5 h-5" />
-           </div>
+           <img src="https://storage.googleapis.com/campus_bucket/my%20photo.jpg" alt="Logo" className="w-8 h-8 rounded-lg object-cover" />
            <span className="font-bold text-slate-800">CompeteHub</span>
         </div>
         <div className="flex items-center gap-3">
@@ -73,9 +71,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
       {/* Sidebar (Desktop) */}
       <aside className={`fixed inset-y-0 left-0 z-40 w-64 bg-slate-900 text-slate-100 transform transition-transform duration-200 md:translate-x-0 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} md:static md:flex md:flex-col`}>
         <div className="p-6 border-b border-slate-800 flex items-center gap-3">
-           <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/30">
-             <Trophy className="text-white w-6 h-6" />
-           </div>
+           <img src="https://storage.googleapis.com/campus_bucket/my%20photo.jpg" alt="Logo" className="w-10 h-10 rounded-xl object-cover shadow-lg shadow-blue-500/30" />
            <div>
              <h1 className="font-bold text-lg leading-tight">Campus<br/>Complete</h1>
            </div>
