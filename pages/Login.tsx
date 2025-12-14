@@ -182,8 +182,25 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
     }
 
     try {
+      // Prepare full user data object for Firestore
+      const signupData = {
+        name: formData.name,
+        role: formData.role,
+        collegeId: selectedCollege,
+        department: formData.department,
+        academicYear: formData.academicYear,
+        section: formData.section,
+        uniqueId: formData.uniqueId,
+        phoneNumber: formData.phoneNumber
+      };
+
       // Use Firebase Signup
-      const { user, error: signupError } = await firebaseSignup(formData.email, formData.password, formData.name);
+      const { user, error: signupError } = await firebaseSignup(
+        formData.email, 
+        formData.password, 
+        signupData, 
+        profilePhoto
+      );
 
       if (signupError) {
         setError(signupError); // Will display "User already exists. Sign in?"
