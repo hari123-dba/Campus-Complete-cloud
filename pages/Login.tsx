@@ -64,10 +64,11 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
       const loadedColleges = await getColleges();
       setColleges(loadedColleges);
       
-      // Auto-select first college if data exists but selection is empty/invalid
+      // Auto-select the specific ID if available, otherwise first
       if (loadedColleges.length > 0) {
         if (!selectedCollege) {
-          setSelectedCollege(loadedColleges[0].id);
+          const defaultCol = loadedColleges.find(c => c.id === '4Thk3nIJesDG7oPX3Jcg') || loadedColleges[0];
+          setSelectedCollege(defaultCol.id);
         }
       }
     } catch (e) {
@@ -103,7 +104,7 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
   }, [activeTab, selectedCollege, showForgotPassword]);
 
   const handleDemoLogin = async (role: UserRole, email: string) => {
-    if (role !== UserRole.ADMIN && selectedCollege !== 'col_1') {
+    if (role !== UserRole.ADMIN && selectedCollege !== '4Thk3nIJesDG7oPX3Jcg') {
       setError('Quick Demo is only available for "Campus Complete Demo Univ"');
       return;
     }
@@ -510,7 +511,7 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
             <div className="space-y-4 animate-fade-in">
                 <div className="text-center mb-4">
                 <p className="text-xs text-slate-400">
-                    {selectedCollege === 'col_1' ? 'Tap any role below to auto-fill credentials' : 'Switch to "Campus Complete Demo Univ" for quick access (Admin is global)'}
+                    {selectedCollege === '4Thk3nIJesDG7oPX3Jcg' ? 'Tap any role below to auto-fill credentials' : 'Switch to "Campus Complete Demo Univ" for quick access (Admin is global)'}
                 </p>
                 </div>
                 {(Object.values(UserRole) as UserRole[]).map((role) => (
@@ -518,7 +519,7 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
                     key={role} 
                     role={role} 
                     onClick={handleDemoLogin}
-                    isLoading={isLoading || (selectedCollege !== 'col_1' && role !== UserRole.ADMIN)}
+                    isLoading={isLoading || (selectedCollege !== '4Thk3nIJesDG7oPX3Jcg' && role !== UserRole.ADMIN)}
                 />
                 ))}
             </div>

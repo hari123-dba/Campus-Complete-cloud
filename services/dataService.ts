@@ -10,7 +10,7 @@ import { deleteUser } from 'firebase/auth';
 // --- SEED DATA CONSTANTS (Kept for Database Initialization) ---
 const SEED_COLLEGES: College[] = [
   { 
-    id: 'col_1', 
+    id: '4Thk3nIJesDG7oPX3Jcg', 
     name: 'Campus Complete Demo Univ', 
     emailId: 'campus.edu', 
     website: 'https://demo.campus.edu', 
@@ -60,22 +60,22 @@ const SEED_USERS: User[] = [
   { 
     id: 'u_princ', firstName: 'Principal', lastName: 'Skinner', name: 'Principal Skinner', 
     email: 'principal@campus.edu', role: UserRole.PRINCIPAL, avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Skinner', 
-    collegeId: 'col_1', status: 'Active', uniqueId: 'PRN001', phoneNumber: '555-0101', academicBackground: 'PhD in Education' 
+    collegeId: '4Thk3nIJesDG7oPX3Jcg', status: 'Active', uniqueId: 'PRN001', phoneNumber: '555-0101', academicBackground: 'PhD in Education' 
   },
   { 
     id: 'u_hod', firstName: 'HOD', lastName: 'Smith', name: 'HOD Smith', 
     email: 'hod@campus.edu', role: UserRole.HOD, avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Smith', 
-    collegeId: 'col_1', status: 'Active', uniqueId: 'HOD001', phoneNumber: '555-0102', department: 'Computer Science & Engineering', academicBackground: 'M.Tech CSE'
+    collegeId: '4Thk3nIJesDG7oPX3Jcg', status: 'Active', uniqueId: 'HOD001', phoneNumber: '555-0102', department: 'Computer Science & Engineering', academicBackground: 'M.Tech CSE'
   },
   { 
     id: 'u_lec', firstName: 'Lecturer', lastName: 'Doe', name: 'Lecturer Doe', 
     email: 'lecturer@campus.edu', role: UserRole.LECTURER, avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Doe', 
-    collegeId: 'col_1', status: 'Active', uniqueId: 'LEC001', phoneNumber: '555-0103', department: 'Computer Science & Engineering', academicBackground: 'B.Tech CSE'
+    collegeId: '4Thk3nIJesDG7oPX3Jcg', status: 'Active', uniqueId: 'LEC001', phoneNumber: '555-0103', department: 'Computer Science & Engineering', academicBackground: 'B.Tech CSE'
   },
   { 
     id: 'u_stu', firstName: 'Student', lastName: 'User', name: 'Student User', 
     email: 'student@campus.edu', role: UserRole.STUDENT, avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Student', 
-    collegeId: 'col_1', status: 'Active', uniqueId: 'STU001', phoneNumber: '555-0104', department: 'Computer Science & Engineering', academicYear: '4th Year', section: 'A'
+    collegeId: '4Thk3nIJesDG7oPX3Jcg', status: 'Active', uniqueId: 'STU001', phoneNumber: '555-0104', department: 'Computer Science & Engineering', academicYear: '4th Year', section: 'A'
   }
 ];
 
