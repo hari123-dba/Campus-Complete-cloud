@@ -2,9 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { UserRole, College } from '../types';
 import { RoleCard } from '../components/RoleCard';
 // Use the new firebase auth functions
-import { firebaseLogin, firebaseSignup, sendPasswordReset, signInWithGoogle, login as mockLogin } from '../services/authService';
+import { firebaseLogin, firebaseSignup, sendPasswordReset, signInWithGoogle, login as mockLogin, resendVerification } from '../services/authService';
 import { getColleges, resetDatabase, initializeDatabase } from '../services/dataService';
-import { Trophy, AlertCircle, Loader2, School, LogIn, UserPlus, Info, RefreshCw, Upload, MailCheck, KeyRound, ArrowLeft, Database } from 'lucide-react';
+import { Trophy, AlertCircle, Loader2, School, LogIn, UserPlus, Info, RefreshCw, Upload, MailCheck, KeyRound, ArrowLeft, Database, Send, CheckCircle2 } from 'lucide-react';
 import { PWAInstallPrompt } from '../components/PWAInstallPrompt';
 import { DEPARTMENTS, ACADEMIC_YEARS } from '../constants';
 
@@ -24,6 +24,7 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
   // Verification State
   const [showVerification, setShowVerification] = useState(false);
   const [verificationEmail, setVerificationEmail] = useState('');
+  const [showResend, setShowResend] = useState(false); // To show resend button in login screen
 
   // Forgot Password State
   const [showForgotPassword, setShowForgotPassword] = useState(false);
@@ -91,6 +92,7 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
   useEffect(() => {
     setError(null);
     setSuccessMsg(null);
+    setShowResend(false);
     if (activeTab !== 'signup') {
         setShowVerification(false);
     }
@@ -123,12 +125,17 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
     e.preventDefault();
     setIsLoading(true);
     setError(null);
+    setShowResend(false);
+    
     try {
       // Use Firebase Login
       const { user, error: loginError } = await firebaseLogin(loginEmail, loginPassword);
       
       if (loginError) {
         setError(loginError); // Will display "Password or Email Incorrect" or verification error
+        if (loginError.includes("Email not verified")) {
+          setShowResend(true);
+        }
       } else if (user) {
         onLoginSuccess(user);
       }
@@ -192,6 +199,24 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleResendVerification = async (email: string, pass: string) => {
+      setIsLoading(true);
+      setError(null);
+      setSuccessMsg(null);
+      try {
+          const { success, error: resendError } = await resendVerification(email, pass);
+          if (success) {
+              setSuccessMsg("Verification email resent! Please check your inbox (and spam).");
+          } else {
+              setError(resendError || "Failed to resend email.");
+          }
+      } catch (e) {
+          setError("Failed to resend verification email.");
+      } finally {
+          setIsLoading(false);
+      }
   };
 
   const handleForgotPasswordClick = () => {
@@ -265,24 +290,48 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
       
       <div className="w-full max-w-lg bg-white rounded-3xl shadow-2xl p-6 md:p-8 mb-10 animate-fade-in-up">
         
-        {/* Verification Screen */}
+        {/* Verification Screen (Signup Success) */}
         {showVerification ? (
            <div className="flex flex-col items-center text-center animate-fade-in py-8">
                <div className="w-20 h-20 bg-green-100 text-green-600 rounded-full flex items-center justify-center mb-6 shadow-sm">
                    <MailCheck size={40} />
                </div>
                <h2 className="text-2xl font-bold text-slate-800 mb-2">Check your inbox</h2>
-               <p className="text-slate-600 mb-8 leading-relaxed">
+               <p className="text-slate-600 mb-6 leading-relaxed">
                    We have sent you a verification email to <br/>
                    <span className="font-semibold text-slate-800">{verificationEmail}</span>.
                    <br/>Verify it and log in.
                </p>
-               <button 
-                  onClick={handleBackToLogin}
-                  className="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white font-semibold rounded-xl transition-colors flex justify-center items-center gap-2"
-               >
-                  <LogIn size={18} /> Login
-               </button>
+
+               {successMsg && (
+                    <div className="mb-6 p-3 bg-green-50 border border-green-100 rounded-xl flex items-center justify-center gap-2 text-green-700 text-sm animate-fade-in w-full">
+                        <CheckCircle2 size={16} />
+                        <span>{successMsg}</span>
+                    </div>
+                )}
+                {error && (
+                    <div className="mb-6 p-3 bg-red-50 border border-red-100 rounded-xl flex items-center justify-center gap-2 text-red-700 text-sm animate-fade-in w-full">
+                        <AlertCircle size={16} />
+                        <span>{error}</span>
+                    </div>
+                )}
+
+               <div className="flex flex-col gap-3 w-full">
+                   <button 
+                      onClick={handleBackToLogin}
+                      className="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white font-semibold rounded-xl transition-colors flex justify-center items-center gap-2"
+                   >
+                      <LogIn size={18} /> Login
+                   </button>
+                   <button 
+                      onClick={() => handleResendVerification(verificationEmail, formData.password)}
+                      disabled={isLoading}
+                      className="w-full py-3 bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 font-semibold rounded-xl transition-colors flex justify-center items-center gap-2 text-sm"
+                   >
+                      {isLoading ? <Loader2 className="animate-spin" size={16} /> : <Send size={16} />} 
+                      Resend Verification Email
+                   </button>
+               </div>
            </div>
         ) : showForgotPassword ? (
             /* Forgot Password Flow */
@@ -416,9 +465,20 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
 
             {/* Messages */}
             {error && (
-            <div className="mb-6 p-4 bg-red-50 border border-red-100 rounded-xl flex items-start gap-3 text-red-700 text-sm animate-fade-in">
-                <AlertCircle size={18} className="shrink-0 mt-0.5" />
-                <span>{error}</span>
+            <div className="mb-6 p-4 bg-red-50 border border-red-100 rounded-xl flex flex-col gap-2 text-red-700 text-sm animate-fade-in">
+                <div className="flex items-start gap-3">
+                   <AlertCircle size={18} className="shrink-0 mt-0.5" />
+                   <span>{error}</span>
+                </div>
+                {/* Resend Link in Login View */}
+                {showResend && activeTab === 'login' && (
+                    <button 
+                      onClick={() => handleResendVerification(loginEmail, loginPassword)}
+                      className="self-end text-xs font-bold text-blue-600 hover:underline flex items-center gap-1 mt-1"
+                    >
+                      {isLoading ? <Loader2 className="animate-spin" size={12} /> : "Didn't receive it? Resend Email"}
+                    </button>
+                )}
             </div>
             )}
             {successMsg && (

@@ -166,6 +166,30 @@ export const firebaseSignup = async (email: string, password: string, userData: 
     }
 };
 
+export const resendVerification = async (email: string, password: string): Promise<{ success: boolean; error: string | null }> => {
+    try {
+        // We must sign in to send verification, then sign out immediately
+        const userCredential = await signInWithEmailAndPassword(auth, email, password);
+        const user = userCredential.user;
+        
+        if (user.emailVerified) {
+            await signOut(auth);
+            return { success: false, error: "User is already verified. Please login." };
+        }
+
+        await sendEmailVerification(user);
+        await signOut(auth);
+        return { success: true, error: null };
+    } catch (error: any) {
+        console.error("Resend Verification Error:", error);
+        let msg = error.message;
+        if (error.code === 'auth/too-many-requests') {
+            msg = "Too many requests. Please wait a moment before trying again.";
+        }
+        return { success: false, error: msg };
+    }
+};
+
 export const sendPasswordReset = async (email: string): Promise<{ success: boolean; error: string | null }> => {
     try {
         await sendPasswordResetEmail(auth, email);
