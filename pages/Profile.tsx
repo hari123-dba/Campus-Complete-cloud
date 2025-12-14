@@ -2,7 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { User } from '../types';
 import { updateUserProfile, deleteUserAccount, uploadImage, deleteFile } from '../services/dataService';
 import { logout } from '../services/authService';
-import { UserCircle, Save, Trash2, Phone, CreditCard, Mail, Building, Loader2, AlertCircle, CheckCircle2, Camera } from 'lucide-react';
+import { UserCircle, Save, Trash2, Phone, CreditCard, Mail, Building, Loader2, AlertCircle, CheckCircle2, Camera, Briefcase } from 'lucide-react';
+import { DEPARTMENTS } from '../constants';
 
 interface ProfileProps {
   user: User;
@@ -265,6 +266,30 @@ export const Profile: React.FC<ProfileProps> = ({ user }) => {
                                     value={formData.uniqueId || ''}
                                     onChange={e => setFormData({...formData, uniqueId: e.target.value})}
                                 />
+                            </div>
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">Department</label>
+                            <div className="relative">
+                                <Briefcase className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                                {isEditing ? (
+                                    <select
+                                        className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 outline-none disabled:bg-slate-50 disabled:text-slate-500 appearance-none bg-white"
+                                        value={formData.department || ''}
+                                        onChange={e => setFormData({...formData, department: e.target.value})}
+                                    >
+                                        <option value="">Select Department</option>
+                                        {DEPARTMENTS.map(d => <option key={d} value={d}>{d}</option>)}
+                                    </select>
+                                ) : (
+                                    <input 
+                                        type="text" 
+                                        disabled
+                                        className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 outline-none disabled:bg-slate-50 disabled:text-slate-500"
+                                        value={formData.department || ''}
+                                    />
+                                )}
                             </div>
                         </div>
                         

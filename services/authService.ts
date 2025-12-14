@@ -19,7 +19,7 @@ const mapUserDocsToAppUser = (authUser: any, docData: any): any => {
     };
 };
 
-// Sync mechanism: Ensure Firestore doc exists
+// Sync mechanism: Ensure Firestore doc exists at /users/{uid}
 const ensureFirestoreDoc = async (authUser: any, additionalData: any = {}) => {
     const userRef = doc(db, 'users', authUser.uid);
     const userSnap = await getDoc(userRef);
@@ -27,8 +27,9 @@ const ensureFirestoreDoc = async (authUser: any, additionalData: any = {}) => {
     if (userSnap.exists()) {
         return userSnap.data();
     } else {
-        // Create new doc if missing
+        // Create new doc if missing (Syncs Auth user to Firestore)
         const newUserData = {
+            id: authUser.uid,
             uid: authUser.uid,
             name: authUser.displayName || additionalData.name || authUser.email?.split('@')[0],
             email: authUser.email,
@@ -37,6 +38,7 @@ const ensureFirestoreDoc = async (authUser: any, additionalData: any = {}) => {
             createdAt: new Date().toISOString(),
             status: 'Active',
             collegeId: additionalData.collegeId || 'col_1',
+            photoFileName: additionalData.photoFileName || null,
             ...additionalData
         };
         await setDoc(userRef, newUserData);
@@ -138,7 +140,7 @@ export const firebaseSignup = async (email: string, password: string, userData: 
             photoURL: photoURL
         });
 
-        // Create Firestore Document
+        // Create Firestore Document with explicit path /users/{uid}
         const firestoreData = {
             ...userData,
             photoFileName, // Store filename as requested
@@ -147,6 +149,7 @@ export const firebaseSignup = async (email: string, password: string, userData: 
             createdAt: new Date().toISOString()
         };
         
+        // Pass firestoreData to ensure it is saved
         await ensureFirestoreDoc(fbUser, firestoreData);
 
         // Send Verification Email

@@ -369,13 +369,48 @@ export const updateUserProfile = async (uid: string, data: Partial<User>) => {
       localStorage.setItem('cc_session', JSON.stringify({ ...sessionUser, ...data }));
     }
   }
+
+  // Cascading updates for denormalized data (Teams)
+  // If name or avatar changes, we should update the member info in their teams
+  if (data.name || data.avatar) {
+      const teams = await getUserTeams(uid);
+      for (const team of teams) {
+          const updatedMembers = team.members.map(m => {
+              if (m.userId === uid) {
+                  return { 
+                      ...m, 
+                      name: data.name || m.name, 
+                      avatar: data.avatar || m.avatar 
+                  };
+              }
+              return m;
+          });
+          await updateDoc(doc(db, 'teams', team.id), { members: updatedMembers });
+      }
+  }
 };
 
 export const deleteUserAccount = async (uid: string) => {
+  // 1. Remove from Teams to update records accordingly
+  const teams = await getUserTeams(uid);
+  for (const team of teams) {
+      const updatedMembers = team.members.filter(m => m.userId !== uid);
+      if (updatedMembers.length === 0) {
+          // If team is empty, remove team (optional logic, but cleaner)
+          await deleteDoc(doc(db, 'teams', team.id));
+      } else {
+          await updateDoc(doc(db, 'teams', team.id), { members: updatedMembers });
+      }
+  }
+
+  // 2. Delete User Doc
   await deleteDoc(doc(db, 'users', uid));
+
+  // 3. Delete Auth User (if current)
   if (auth.currentUser && auth.currentUser.uid === uid) {
       await deleteUser(auth.currentUser);
   }
+  
   localStorage.removeItem('cc_session');
 };
 
