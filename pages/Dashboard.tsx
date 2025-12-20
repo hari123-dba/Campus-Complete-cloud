@@ -7,7 +7,7 @@ import {
 import { 
   Clock, TrendingUp, AlertCircle, CheckCircle2, UserCheck, XCircle, 
   School, X, Loader2, Shield, Users, Trophy, Award,
-  FileText, Activity, BarChart2, Power, Trash2, Building2, FolderKanban, ClipboardCheck, Globe, MapPin, Phone, UserCog, GraduationCap, Zap, ChevronRight, Plus, Rocket, BookOpen, Target, Calendar, Upload, ImageIcon
+  FileText, Activity, BarChart2, Power, Trash2, Building2, FolderKanban, ClipboardCheck, Globe, MapPin, Phone, UserCog, GraduationCap, Zap, ChevronRight, Plus, Rocket, BookOpen, Target, Calendar, Upload, ImageIcon, Key
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
@@ -30,7 +30,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
   const [showAddCollegeModal, setShowAddCollegeModal] = useState(false);
   const [showAnalyticsModal, setShowAnalyticsModal] = useState(false);
   const [newCollegeForm, setNewCollegeForm] = useState({ 
-    name: '', emailId: '', website: '', address: '', contactPhone: ''
+    name: '', emailId: '', website: '', address: '', contactPhone: '', customId: ''
   });
   const [collegeLogo, setCollegeLogo] = useState<File | null>(null);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
@@ -166,10 +166,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
         website: newCollegeForm.website,
         address: newCollegeForm.address,
         contactPhone: newCollegeForm.contactPhone
-      }, undefined, collegeLogo || undefined);
+      }, newCollegeForm.customId || undefined, collegeLogo || undefined);
 
       setModalMsg({ type: 'success', text: 'College added successfully.' });
-      setNewCollegeForm({ name: '', emailId: '', website: '', address: '', contactPhone: '' });
+      setNewCollegeForm({ name: '', emailId: '', website: '', address: '', contactPhone: '', customId: '' });
       setCollegeLogo(null);
       setCollegeList(await getColleges());
       setSystemLogs(await getSystemLogs());
@@ -662,6 +662,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
                             </div>
                             
                             <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500 mt-1">
+                              <span className="flex items-center gap-1" title="Document ID">
+                                <Key size={12} className="text-slate-400"/> {college.id}
+                              </span>
                               <span className="flex items-center gap-1" title="Domain ID">
                                 <Shield size={12} className="text-slate-400"/> {college.emailId}
                               </span>
@@ -724,7 +727,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
        {/* MODALS */}
        {showAddCollegeModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-fade-in">
-            <div className="bg-white w-full max-w-lg rounded-2xl shadow-xl p-6">
+            <div className="bg-white w-full max-w-lg rounded-2xl shadow-xl p-6 overflow-y-auto max-h-[90vh]">
               <div className="flex justify-between items-center mb-6">
                 <h3 className="text-xl font-bold text-slate-800">Add College</h3>
                 <button onClick={() => setShowAddCollegeModal(false)} className="text-slate-400 hover:text-slate-600">
@@ -733,7 +736,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
               </div>
               <form onSubmit={handleAddCollege} className="space-y-4">
                 {modalMsg && (
-                  <div className={`p-3 rounded-lg flex items-center gap-2 text-sm ${modalMsg.type === 'error' ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-600'}`}>
+                  <div className={`p-3 rounded-lg flex items-center gap-2 text-sm ${modalMsg.type === 'error' ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-700'}`}>
                      <AlertCircle size={16} />
                      <span>{modalMsg.text}</span>
                   </div>
@@ -743,8 +746,19 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
                   <div className="md:col-span-2">
                     <label className="block text-sm font-medium text-slate-700 mb-1">Institution Name <span className="text-red-500">*</span></label>
                     <input type="text" required className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 outline-none"
-                        placeholder="e.g. Springfield Tech"
+                        placeholder="e.g. Campus Complete Demo Univ"
                         value={newCollegeForm.name} onChange={(e) => setNewCollegeForm({...newCollegeForm, name: e.target.value})} />
+                  </div>
+
+                  <div className="md:col-span-2">
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Custom Document ID (Optional)</label>
+                    <div className="relative">
+                      <Key className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
+                      <input type="text" className="w-full pl-10 pr-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 outline-none font-mono text-sm"
+                          placeholder="e.g. kWE1Ir8wlBnv31BdZyDQ"
+                          value={newCollegeForm.customId} onChange={(e) => setNewCollegeForm({...newCollegeForm, customId: e.target.value})} />
+                    </div>
+                    <p className="text-[10px] text-slate-400 mt-1 ml-1">Leave blank for auto-generated ID.</p>
                   </div>
                   
                   {/* File Upload for Logo with Preview */}
@@ -793,22 +807,22 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-1">Domain (@)</label>
                     <input type="text" className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 outline-none"
-                        placeholder="univ.edu" value={newCollegeForm.emailId} onChange={(e) => setNewCollegeForm({...newCollegeForm, emailId: e.target.value})} />
+                        placeholder="campus.edu" value={newCollegeForm.emailId} onChange={(e) => setNewCollegeForm({...newCollegeForm, emailId: e.target.value})} />
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-1">Phone</label>
                     <input type="tel" className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 outline-none"
-                        placeholder="555-0100" value={newCollegeForm.contactPhone} onChange={(e) => setNewCollegeForm({...newCollegeForm, contactPhone: e.target.value})} />
+                        placeholder="555-0199" value={newCollegeForm.contactPhone} onChange={(e) => setNewCollegeForm({...newCollegeForm, contactPhone: e.target.value})} />
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-1">Website</label>
                     <input type="url" className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 outline-none"
-                        placeholder="https://" value={newCollegeForm.website} onChange={(e) => setNewCollegeForm({...newCollegeForm, website: e.target.value})} />
+                        placeholder="https://demo.campus.edu" value={newCollegeForm.website} onChange={(e) => setNewCollegeForm({...newCollegeForm, website: e.target.value})} />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">City / Location</label>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Address / Location</label>
                     <input type="text" className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 outline-none"
-                        placeholder="City, State" value={newCollegeForm.address} onChange={(e) => setNewCollegeForm({...newCollegeForm, address: e.target.value})} />
+                        placeholder="123 Innovation Drive, Tech City" value={newCollegeForm.address} onChange={(e) => setNewCollegeForm({...newCollegeForm, address: e.target.value})} />
                   </div>
                   
                 </div>

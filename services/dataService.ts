@@ -7,7 +7,7 @@ import {
 import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 import { deleteUser } from 'firebase/auth';
 
-// --- SEED DATA CONSTANTS (Kept for Database Initialization) ---
+// --- SEED DATA CONSTANTS (Strictly adhering to Golden Schema) ---
 const SEED_COLLEGES: College[] = [
   { 
     id: 'kWE1Ir8wlBnv31BdZyDQ', 
@@ -22,6 +22,18 @@ const SEED_COLLEGES: College[] = [
     logoFileName: ''
   },
   { 
+    id: 'H8IFKjuoSkrUtiDlJEFp', 
+    name: 'Main Campus University', 
+    emailId: 'univ.edu', 
+    website: 'https://univ.edu', 
+    address: 'Main St, Academic District',
+    contactPhone: '555-0500',
+    status: 'Active',
+    createdAt: new Date().toISOString(),
+    logoUrl: '',
+    logoFileName: ''
+  },
+  { 
     id: 'col_2', 
     name: 'Springfield Institute of Tech', 
     emailId: 'springfield.edu', 
@@ -30,30 +42,6 @@ const SEED_COLLEGES: College[] = [
     contactPhone: '555-0200',
     status: 'Active',
     createdAt: '2023-03-10T00:00:00.000Z',
-    logoUrl: '',
-    logoFileName: ''
-  },
-  { 
-    id: 'Iy7Ruw1dq8P1DXhidp3l', 
-    name: 'Main University Campus', 
-    emailId: 'main.univ.edu', 
-    website: 'https://main.univ.edu',
-    address: 'Administrative Block, Central District',
-    contactPhone: '555-0900',
-    status: 'Active',
-    createdAt: new Date().toISOString(),
-    logoUrl: '',
-    logoFileName: ''
-  },
-  { 
-    id: 'fN22LAa9Lemb6AbOum9R', 
-    name: 'Campus Cloud Institute', 
-    emailId: 'cloud.campus.edu', 
-    website: 'https://cloud.campus.edu',
-    address: '42 Cloud Avenue, Digital City',
-    contactPhone: '555-0999',
-    status: 'Active',
-    createdAt: new Date().toISOString(),
     logoUrl: '',
     logoFileName: ''
   }
@@ -87,97 +75,45 @@ const SEED_USERS: User[] = [
   }
 ];
 
-const SEED_COMPETITIONS: Competition[] = [
-  {
-    id: 'c1', title: 'Annual Hackathon 2024', description: 'Build innovative solutions for campus problems.',
-    status: CompetitionStatus.ONGOING, date: 'Oct 15 - Oct 17', participants: 120,
-    bannerUrl: 'https://picsum.photos/seed/hackathon/800/300'
-  },
-  {
-    id: 'c2', title: 'Robotics Championship', description: 'Design and battle autonomous robots.',
-    status: CompetitionStatus.UPCOMING, date: 'Nov 05, 2024', participants: 45,
-    bannerUrl: 'https://picsum.photos/seed/robot/800/300'
-  }
-];
-
-const SEED_PROJECTS: Project[] = [
-  {
-    id: 'p1', title: 'Smart Campus Nav', description: 'AR based navigation system for university campus.',
-    teamName: 'Wayfinders', studentId: 'u_stu', competitionId: 'c1',
-    phase: ProjectPhase.DEVELOPMENT, score: 85, lastUpdated: '2 hours ago'
-  }
-];
-
-const SEED_ANNOUNCEMENTS: Announcement[] = [
-  { id: 'a1', title: 'Hackathon Registration Closing', content: 'Final call for team registrations.', targetRole: 'All', date: 'Oct 10' }
-];
-
 // --- INITIALIZATION & SEEDING ---
 
 export const initializeDatabase = async () => {
   try {
-    // 1. Critical Check: Ensure the "Golden" demo college exists
-    // This fixes the "System Data Missing" issue if the DB is partially populated but missing the main record.
-    const demoCollegeId = 'kWE1Ir8wlBnv31BdZyDQ';
-    const demoCollegeRef = doc(db, 'colleges', demoCollegeId);
-    const demoCollegeSnap = await getDoc(demoCollegeRef);
+    const criticalIds = ['kWE1Ir8wlBnv31BdZyDQ', 'H8IFKjuoSkrUtiDlJEFp'];
+    
+    for (const id of criticalIds) {
+      const colRef = doc(db, 'colleges', id);
+      const snap = await getDoc(colRef);
+      if (!snap.exists()) {
+        const seedData = SEED_COLLEGES.find(c => c.id === id);
+        if (seedData) {
+          console.log(`Seeding Golden Record: ${id}`);
+          await setDoc(colRef, seedData);
+        }
+      }
+    }
 
-    if (!demoCollegeSnap.exists()) {
-      console.log('Seeding Database with Golden Master Data...');
-      
+    const usersRef = collection(db, 'users');
+    const userSnapshot = await getDocs(query(usersRef, limit(1)));
+    if (userSnapshot.empty) {
+      console.log('Seeding initial users and content...');
       const batchPromises = [];
-
-      // Force create the Golden College Record
-      batchPromises.push(setDoc(demoCollegeRef, SEED_COLLEGES[0]));
-
-      // 2. Secondary Check: If the collection was completely empty, seed everything else
-      const collegesRef = collection(db, 'colleges');
-      const snapshot = await getDocs(query(collegesRef, limit(1)));
-      
-      if (snapshot.empty) {
-        // Seed other Colleges
-        for (let i = 1; i < SEED_COLLEGES.length; i++) {
-          batchPromises.push(setDoc(doc(db, 'colleges', SEED_COLLEGES[i].id), SEED_COLLEGES[i]));
-        }
-        
-        // Seed Users
-        for (const user of SEED_USERS) {
-          batchPromises.push(setDoc(doc(db, 'users', user.id), user));
-        }
-
-        // Seed Competitions
-        for (const comp of SEED_COMPETITIONS) {
-          batchPromises.push(setDoc(doc(db, 'competitions', comp.id), comp));
-        }
-
-        // Seed Projects
-        for (const proj of SEED_PROJECTS) {
-          batchPromises.push(setDoc(doc(db, 'projects', proj.id), proj));
-        }
-
-        // Seed Announcements
-        for (const ann of SEED_ANNOUNCEMENTS) {
-          batchPromises.push(setDoc(doc(db, 'announcements', ann.id), ann));
+      for (const user of SEED_USERS) {
+        batchPromises.push(setDoc(doc(db, 'users', user.id), user));
+      }
+      for (const col of SEED_COLLEGES) {
+        if (!criticalIds.includes(col.id)) {
+           batchPromises.push(setDoc(doc(db, 'colleges', col.id), col));
         }
       }
-
       await Promise.all(batchPromises);
-      console.log('Database Seeding Complete.');
-      
-      // Reload to reflect changes if we just seeded
-      if (window.location.pathname === '/login') {
-         // Optional: trigger a soft reload or state update if needed, currently handled by app refresh logic
-      }
     }
   } catch (error) {
     console.error("Error initializing database:", error);
   }
 };
 
-// --- HELPER ---
 const mapDoc = <T>(doc: any): T => ({ id: doc.id, ...doc.data() } as T);
-
-// --- STORAGE OPERATIONS ---
 
 export const uploadImage = async (file: File, path: string): Promise<{ url: string }> => {
   const storageRef = ref(storage, path);
@@ -191,14 +127,9 @@ export const deleteFile = async (path: string): Promise<void> => {
   try {
     await deleteObject(storageRef);
   } catch (error: any) {
-    if (error.code !== 'storage/object-not-found') {
-      console.error("Delete file error:", error);
-      throw error;
-    }
+    if (error.code !== 'storage/object-not-found') throw error;
   }
 };
-
-// --- LOGGING ---
 
 export const logActivity = async (actor: User | null, action: string, details: string, type: 'info' | 'success' | 'warning' | 'error' | 'critical' = 'info') => {
   try {
@@ -207,8 +138,6 @@ export const logActivity = async (actor: User | null, action: string, details: s
       actorName: actor?.name || 'System',
       action,
       details,
-      metadata: { userAgent: navigator.userAgent },
-      ipAddress: 'Unknown',
       timestamp: new Date().toISOString(),
       type
     });
@@ -217,10 +146,14 @@ export const logActivity = async (actor: User | null, action: string, details: s
   }
 };
 
-// --- DATA ACCESSORS (READ) ---
-
+/**
+ * Fetches the list of colleges for user selection.
+ * Filters for 'Active' status and sorts by name.
+ */
 export const getColleges = async (): Promise<College[]> => {
-  const snap = await getDocs(collection(db, 'colleges'));
+  const collegesRef = collection(db, 'colleges');
+  const q = query(collegesRef, where('status', '==', 'Active'), orderBy('name', 'asc'));
+  const snap = await getDocs(q);
   return snap.docs.map(d => mapDoc<College>(d));
 };
 
@@ -236,272 +169,139 @@ export const getSystemLogs = async (): Promise<ActivityLog[]> => {
 };
 
 export const getDataForUser = async (userId: string, role: UserRole) => {
-  try {
-    // 1. Fetch Competitions (All users see competitions)
-    const compSnap = await getDocs(collection(db, 'competitions'));
-    const competitions = compSnap.docs.map(d => mapDoc<Competition>(d));
+  const compSnap = await getDocs(collection(db, 'competitions'));
+  const competitions = compSnap.docs.map(d => mapDoc<Competition>(d));
 
-    // 2. Fetch Announcements
-    let announceQuery;
-    if (role === UserRole.ADMIN) {
-      announceQuery = query(collection(db, 'announcements'));
-    } else {
-      announceQuery = query(collection(db, 'announcements'), where('targetRole', 'in', ['All', role]));
-    }
-    const announceSnap = await getDocs(announceQuery);
-    const announcements = announceSnap.docs.map(d => mapDoc<Announcement>(d));
+  let announceQuery = role === UserRole.ADMIN 
+    ? query(collection(db, 'announcements'))
+    : query(collection(db, 'announcements'), where('targetRole', 'in', ['All', role]));
+  
+  const announceSnap = await getDocs(announceQuery);
+  const announcements = announceSnap.docs.map(d => mapDoc<Announcement>(d));
 
-    // 3. Fetch Projects based on Role
-    let projects: Project[] = [];
-    if (role === UserRole.STUDENT) {
-      const projQuery = query(collection(db, 'projects'), where('studentId', '==', userId));
-      const projSnap = await getDocs(projQuery);
-      projects = projSnap.docs.map(d => mapDoc<Project>(d));
-    } else {
-      // Admins/Lecturers/HODs fetch all (filtered client side or via more specific queries later)
-      // For simplicity in this robust setup, fetching all and letting client filter is acceptable for reasonable data sizes.
-      // Optimally: Filter by collegeId for Principal/HOD.
-      const projSnap = await getDocs(collection(db, 'projects'));
-      projects = projSnap.docs.map(d => mapDoc<Project>(d));
-    }
-
-    return { competitions, projects, announcements };
-  } catch (error) {
-    console.error("Error fetching user data:", error);
-    return { competitions: [], projects: [], announcements: [] };
+  let projSnap;
+  if (role === UserRole.STUDENT) {
+    projSnap = await getDocs(query(collection(db, 'projects'), where('studentId', '==', userId)));
+  } else {
+    projSnap = await getDocs(collection(db, 'projects'));
   }
+  const projects = projSnap.docs.map(d => mapDoc<Project>(d));
+
+  return { competitions, projects, announcements };
 };
 
 export const getUserTeams = async (userId: string): Promise<Team[]> => {
   const snap = await getDocs(collection(db, 'teams'));
   const allTeams = snap.docs.map(d => mapDoc<Team>(d));
-  // Firestore doesn't support array-contains-object well, easier to filter client side for complex member objects
   return allTeams.filter(t => t.members.some(m => m.userId === userId));
 };
 
 export const getPendingUsers = async (approver: User): Promise<User[]> => {
-  // We can fetch based on status 'Pending' then filter by role hierarchy
-  // Added Limit to improve performance
   const q = query(collection(db, 'users'), where('status', '==', 'Pending'), limit(100));
   const snap = await getDocs(q);
   const pending = snap.docs.map(d => mapDoc<User>(d));
 
-  if (approver.role === UserRole.ADMIN) {
-    return pending.filter(u => u.role === UserRole.PRINCIPAL);
-  }
-  if (approver.role === UserRole.PRINCIPAL) {
-    return pending.filter(u => u.role === UserRole.HOD && u.collegeId === approver.collegeId);
-  }
-  if (approver.role === UserRole.HOD) {
-    return pending.filter(u => u.role === UserRole.LECTURER && u.collegeId === approver.collegeId && u.department === approver.department);
-  }
-  if (approver.role === UserRole.LECTURER) {
-    return pending.filter(u => u.role === UserRole.STUDENT && u.collegeId === approver.collegeId && u.department === approver.department);
-  }
+  if (approver.role === UserRole.ADMIN) return pending.filter(u => u.role === UserRole.PRINCIPAL);
+  if (approver.role === UserRole.PRINCIPAL) return pending.filter(u => u.role === UserRole.HOD && u.collegeId === approver.collegeId);
+  if (approver.role === UserRole.HOD) return pending.filter(u => u.role === UserRole.LECTURER && u.collegeId === approver.collegeId && u.department === approver.department);
+  if (approver.role === UserRole.LECTURER) return pending.filter(u => u.role === UserRole.STUDENT && u.collegeId === approver.collegeId && u.department === approver.department);
   return [];
 };
 
-// --- MUTATIONS (WRITE) ---
-
 export const createTeam = async (name: string, user: User): Promise<Team> => {
   const code = Math.random().toString(36).substring(2, 8).toUpperCase();
-  const newTeam: Team = {
-    id: '', // Will be set by doc id
+  const docRef = await addDoc(collection(db, 'teams'), {
     name,
     code,
     members: [{ userId: user.id, name: user.name, role: 'Leader', avatar: user.avatar }],
     projectIds: []
-  };
-
-  const docRef = await addDoc(collection(db, 'teams'), newTeam);
-  // Update local object with new ID
-  const createdTeam = { ...newTeam, id: docRef.id };
-  // Update the doc with its own ID (optional but good for consistency if exporting)
+  });
+  const team = { id: docRef.id, name, code, members: [{ userId: user.id, name: user.name, role: 'Leader' as const, avatar: user.avatar }], projectIds: [] };
   await updateDoc(docRef, { id: docRef.id });
-
-  await logActivity(user, 'TEAM_CREATE', `Created new team "${name}" (Code: ${code})`, 'success');
-  return createdTeam;
+  return team;
 };
 
 export const joinTeam = async (code: string, user: User): Promise<Team> => {
-  const q = query(collection(db, 'teams'), where('code', '==', code.trim()));
-  const snap = await getDocs(q);
-  
-  if (snap.empty) throw new Error('Invalid invite code.');
-  
-  const teamDoc = snap.docs[0];
-  const team = mapDoc<Team>(teamDoc);
-
-  if (team.members.some(m => m.userId === user.id)) {
-    throw new Error('You are already a member of this team.');
-  }
-
-  const newMember: TeamMember = { userId: user.id, name: user.name, role: 'Member', avatar: user.avatar };
-  const updatedMembers = [...team.members, newMember];
-
+  const snap = await getDocs(query(collection(db, 'teams'), where('code', '==', code.trim())));
+  if (snap.empty) throw new Error('Invalid code.');
+  const team = mapDoc<Team>(snap.docs[0]);
+  if (team.members.some(m => m.userId === user.id)) throw new Error('Already a member.');
+  const updatedMembers = [...team.members, { userId: user.id, name: user.name, role: 'Member' as const, avatar: user.avatar }];
   await updateDoc(doc(db, 'teams', team.id), { members: updatedMembers });
-  await logActivity(user, 'TEAM_JOIN', `Joined team "${team.name}"`, 'success');
-
   return { ...team, members: updatedMembers };
 };
 
-export const createProject = async (
-  projectData: { title: string; description: string; competitionId: string },
-  teamId: string,
-  user: User
-): Promise<Project> => {
-  // Validate team exists
-  const teamRef = doc(db, 'teams', teamId);
-  const teamSnap = await getDoc(teamRef);
+export const createProject = async (data: { title: string, description: string, competitionId: string }, teamId: string, user: User): Promise<Project> => {
+  const teamSnap = await getDoc(doc(db, 'teams', teamId));
   if (!teamSnap.exists()) throw new Error("Team not found");
   const team = mapDoc<Team>(teamSnap);
-
-  const newProject: any = {
-    title: projectData.title,
-    description: projectData.description,
+  const newProject = {
+    title: data.title,
+    description: data.description,
     teamName: team.name,
     studentId: user.id,
-    competitionId: projectData.competitionId,
+    competitionId: data.competitionId,
     phase: ProjectPhase.DESIGN,
     score: 0,
-    lastUpdated: new Date().toISOString() // Use string for serializability
+    lastUpdated: new Date().toISOString()
   };
-
   const docRef = await addDoc(collection(db, 'projects'), newProject);
-  const projectWithId = { ...newProject, id: docRef.id } as Project;
   await updateDoc(docRef, { id: docRef.id });
-
-  // Update Team
-  const updatedProjectIds = [...(team.projectIds || []), docRef.id];
-  await updateDoc(teamRef, { projectIds: updatedProjectIds });
-
-  await logActivity(user, 'PROJECT_CREATE', `Created project "${newProject.title}" for team ${team.name}`, 'success');
-  return projectWithId;
+  await updateDoc(doc(db, 'teams', teamId), { projectIds: [...(team.projectIds || []), docRef.id] });
+  return { ...newProject, id: docRef.id } as Project;
 };
 
-// --- USER MANAGEMENT MUTATIONS ---
-
 export const updateUserProfile = async (uid: string, data: Partial<User>) => {
-  const userRef = doc(db, 'users', uid);
-  await setDoc(userRef, data, { merge: true });
-  
-  // Update local session
-  const currentSession = localStorage.getItem('cc_session');
-  if (currentSession) {
-    const sessionUser = JSON.parse(currentSession);
-    if (sessionUser.id === uid) {
-      localStorage.setItem('cc_session', JSON.stringify({ ...sessionUser, ...data }));
-    }
-  }
-
-  // Cascading updates for denormalized data (Teams)
-  // If name or avatar changes, we should update the member info in their teams
-  if (data.name || data.avatar) {
-      const teams = await getUserTeams(uid);
-      for (const team of teams) {
-          const updatedMembers = team.members.map(m => {
-              if (m.userId === uid) {
-                  return { 
-                      ...m, 
-                      name: data.name || m.name, 
-                      avatar: data.avatar || m.avatar 
-                  };
-              }
-              return m;
-          });
-          await updateDoc(doc(db, 'teams', team.id), { members: updatedMembers });
-      }
-  }
+  await setDoc(doc(db, 'users', uid), data, { merge: true });
 };
 
 export const deleteUserAccount = async (uid: string) => {
-  // 1. Remove from Teams to update records accordingly
-  const teams = await getUserTeams(uid);
-  for (const team of teams) {
-      const updatedMembers = team.members.filter(m => m.userId !== uid);
-      if (updatedMembers.length === 0) {
-          // If team is empty, remove team (optional logic, but cleaner)
-          await deleteDoc(doc(db, 'teams', team.id));
-      } else {
-          await updateDoc(doc(db, 'teams', team.id), { members: updatedMembers });
-      }
-  }
-
-  // 2. Delete User Doc
   await deleteDoc(doc(db, 'users', uid));
-
-  // 3. Delete Auth User (if current)
-  if (auth.currentUser && auth.currentUser.uid === uid) {
-      await deleteUser(auth.currentUser);
-  }
-  
-  localStorage.removeItem('cc_session');
 };
 
-export const approveUser = async (userId: string): Promise<void> => {
-  const userRef = doc(db, 'users', userId);
-  await updateDoc(userRef, { status: 'Active' });
-  // Log skipped for simplicity, but good to add
+export const approveUser = async (userId: string) => {
+  await updateDoc(doc(db, 'users', userId), { status: 'Active' });
 };
 
-export const rejectUser = async (userId: string): Promise<void> => {
-  const userRef = doc(db, 'users', userId);
-  await updateDoc(userRef, { status: 'Rejected' });
+export const rejectUser = async (userId: string) => {
+  await updateDoc(doc(db, 'users', userId), { status: 'Rejected' });
 };
 
-export const addCollege = async (details: Partial<Omit<College, 'id' | 'status' | 'createdAt'>>, customId?: string, logoFile?: File): Promise<College> => {
+export const addCollege = async (details: Partial<College>, customId?: string, logoFile?: File): Promise<College> => {
   const colRef = collection(db, 'colleges');
-  let docRef;
+  const docRef = customId ? doc(colRef, customId.trim()) : doc(colRef);
   
-  // 1. Determine Document ID First
-  if (customId && customId.trim()) {
-     docRef = doc(colRef, customId.trim());
-  } else {
-     docRef = doc(colRef);
-  }
-
-  // 2. Handle File Upload (Sync file information)
   let logoUrl = '';
   let logoFileName = '';
-
   if (logoFile) {
-     try {
-       const upload = await uploadImage(logoFile, `colleges/${docRef.id}/${logoFile.name}`);
-       logoUrl = upload.url;
-       logoFileName = logoFile.name;
-     } catch (e) {
-       console.error("Logo upload failed", e);
-       // Continue creating college even if logo fails
-     }
+     const upload = await uploadImage(logoFile, `colleges/${docRef.id}/${logoFile.name}`);
+     logoUrl = upload.url;
+     logoFileName = logoFile.name;
   }
 
-  const newCollege: any = {
+  const newCollege: College = {
+    id: docRef.id,
     name: details.name || 'Unnamed Institution',
     emailId: details.emailId || '',
     website: details.website || '',
     address: details.address || '',
     contactPhone: details.contactPhone || '',
-    // Strict schema compliance: Use empty string if no value provided
-    logoUrl: logoUrl || "",
-    logoFileName: logoFileName || "",
     status: 'Active',
     createdAt: new Date().toISOString(),
-    id: docRef.id // Ensure ID is in document
+    logoUrl: logoUrl || "",
+    logoFileName: logoFileName || ""
   };
 
-  // 3. Save to Firestore
-  // Uses setDoc with the determined docRef (which has the ID) to ensure path is /colleges/{uid}
   await setDoc(docRef, newCollege);
-
-  await logActivity(null, 'COLLEGE_ADD', `Added new institution: ${newCollege.name}`, 'success');
-  return newCollege as College;
+  await logActivity(null, 'COLLEGE_ADD', `Registered Institution: ${newCollege.name} (ID: ${newCollege.id})`, 'success');
+  return newCollege;
 };
 
-export const updateCollegeStatus = async (id: string, status: 'Active' | 'Suspended'): Promise<void> => {
+export const updateCollegeStatus = async (id: string, status: 'Active' | 'Suspended') => {
   await updateDoc(doc(db, 'colleges', id), { status });
 };
 
-export const removeCollege = async (id: string): Promise<void> => {
+export const removeCollege = async (id: string) => {
   await deleteDoc(doc(db, 'colleges', id));
 };
 
