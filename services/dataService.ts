@@ -10,14 +10,16 @@ import { deleteUser } from 'firebase/auth';
 // --- SEED DATA CONSTANTS (Kept for Database Initialization) ---
 const SEED_COLLEGES: College[] = [
   { 
-    id: 'col_1', 
+    id: 'kWE1Ir8wlBnv31BdZyDQ', 
     name: 'Campus Complete Demo Univ', 
     emailId: 'campus.edu', 
     website: 'https://demo.campus.edu', 
     address: '123 Innovation Drive, Tech City',
     contactPhone: '555-0199',
     status: 'Active',
-    createdAt: new Date('2023-01-15').toISOString()
+    createdAt: '2023-01-15T00:00:00.000Z',
+    logoUrl: '',
+    logoFileName: ''
   },
   { 
     id: 'col_2', 
@@ -27,7 +29,9 @@ const SEED_COLLEGES: College[] = [
     address: '742 Evergreen Terrace, Springfield',
     contactPhone: '555-0200',
     status: 'Active',
-    createdAt: new Date('2023-03-10').toISOString()
+    createdAt: '2023-03-10T00:00:00.000Z',
+    logoUrl: '',
+    logoFileName: ''
   },
   { 
     id: 'Iy7Ruw1dq8P1DXhidp3l', 
@@ -37,7 +41,9 @@ const SEED_COLLEGES: College[] = [
     address: 'Administrative Block, Central District',
     contactPhone: '555-0900',
     status: 'Active',
-    createdAt: new Date().toISOString()
+    createdAt: new Date().toISOString(),
+    logoUrl: '',
+    logoFileName: ''
   },
   { 
     id: 'fN22LAa9Lemb6AbOum9R', 
@@ -47,7 +53,9 @@ const SEED_COLLEGES: College[] = [
     address: '42 Cloud Avenue, Digital City',
     contactPhone: '555-0999',
     status: 'Active',
-    createdAt: new Date().toISOString()
+    createdAt: new Date().toISOString(),
+    logoUrl: '',
+    logoFileName: ''
   }
 ];
 
@@ -60,22 +68,22 @@ const SEED_USERS: User[] = [
   { 
     id: 'u_princ', firstName: 'Principal', lastName: 'Skinner', name: 'Principal Skinner', 
     email: 'principal@campus.edu', role: UserRole.PRINCIPAL, avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Skinner', 
-    collegeId: 'col_1', status: 'Active', uniqueId: 'PRN001', phoneNumber: '555-0101', academicBackground: 'PhD in Education' 
+    collegeId: 'kWE1Ir8wlBnv31BdZyDQ', status: 'Active', uniqueId: 'PRN001', phoneNumber: '555-0101', academicBackground: 'PhD in Education' 
   },
   { 
     id: 'u_hod', firstName: 'HOD', lastName: 'Smith', name: 'HOD Smith', 
     email: 'hod@campus.edu', role: UserRole.HOD, avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Smith', 
-    collegeId: 'col_1', status: 'Active', uniqueId: 'HOD001', phoneNumber: '555-0102', department: 'Computer Science & Engineering', academicBackground: 'M.Tech CSE'
+    collegeId: 'kWE1Ir8wlBnv31BdZyDQ', status: 'Active', uniqueId: 'HOD001', phoneNumber: '555-0102', department: 'Computer Science & Engineering', academicBackground: 'M.Tech CSE'
   },
   { 
     id: 'u_lec', firstName: 'Lecturer', lastName: 'Doe', name: 'Lecturer Doe', 
     email: 'lecturer@campus.edu', role: UserRole.LECTURER, avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Doe', 
-    collegeId: 'col_1', status: 'Active', uniqueId: 'LEC001', phoneNumber: '555-0103', department: 'Computer Science & Engineering', academicBackground: 'B.Tech CSE'
+    collegeId: 'kWE1Ir8wlBnv31BdZyDQ', status: 'Active', uniqueId: 'LEC001', phoneNumber: '555-0103', department: 'Computer Science & Engineering', academicBackground: 'B.Tech CSE'
   },
   { 
     id: 'u_stu', firstName: 'Student', lastName: 'User', name: 'Student User', 
     email: 'student@campus.edu', role: UserRole.STUDENT, avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Student', 
-    collegeId: 'col_1', status: 'Active', uniqueId: 'STU001', phoneNumber: '555-0104', department: 'Computer Science & Engineering', academicYear: '4th Year', section: 'A'
+    collegeId: 'kWE1Ir8wlBnv31BdZyDQ', status: 'Active', uniqueId: 'STU001', phoneNumber: '555-0104', department: 'Computer Science & Engineering', academicYear: '4th Year', section: 'A'
   }
 ];
 
@@ -108,42 +116,58 @@ const SEED_ANNOUNCEMENTS: Announcement[] = [
 
 export const initializeDatabase = async () => {
   try {
-    const collegesRef = collection(db, 'colleges');
-    const snapshot = await getDocs(query(collegesRef, limit(1)));
-    
-    // Only seed if database is empty
-    if (snapshot.empty) {
-      console.log('Seeding Database with Demo Data...');
+    // 1. Critical Check: Ensure the "Golden" demo college exists
+    // This fixes the "System Data Missing" issue if the DB is partially populated but missing the main record.
+    const demoCollegeId = 'kWE1Ir8wlBnv31BdZyDQ';
+    const demoCollegeRef = doc(db, 'colleges', demoCollegeId);
+    const demoCollegeSnap = await getDoc(demoCollegeRef);
+
+    if (!demoCollegeSnap.exists()) {
+      console.log('Seeding Database with Golden Master Data...');
       
       const batchPromises = [];
 
-      // Seed Colleges
-      for (const col of SEED_COLLEGES) {
-        batchPromises.push(setDoc(doc(db, 'colleges', col.id), col));
-      }
+      // Force create the Golden College Record
+      batchPromises.push(setDoc(demoCollegeRef, SEED_COLLEGES[0]));
+
+      // 2. Secondary Check: If the collection was completely empty, seed everything else
+      const collegesRef = collection(db, 'colleges');
+      const snapshot = await getDocs(query(collegesRef, limit(1)));
       
-      // Seed Users
-      for (const user of SEED_USERS) {
-        batchPromises.push(setDoc(doc(db, 'users', user.id), user));
-      }
+      if (snapshot.empty) {
+        // Seed other Colleges
+        for (let i = 1; i < SEED_COLLEGES.length; i++) {
+          batchPromises.push(setDoc(doc(db, 'colleges', SEED_COLLEGES[i].id), SEED_COLLEGES[i]));
+        }
+        
+        // Seed Users
+        for (const user of SEED_USERS) {
+          batchPromises.push(setDoc(doc(db, 'users', user.id), user));
+        }
 
-      // Seed Competitions
-      for (const comp of SEED_COMPETITIONS) {
-        batchPromises.push(setDoc(doc(db, 'competitions', comp.id), comp));
-      }
+        // Seed Competitions
+        for (const comp of SEED_COMPETITIONS) {
+          batchPromises.push(setDoc(doc(db, 'competitions', comp.id), comp));
+        }
 
-      // Seed Projects
-      for (const proj of SEED_PROJECTS) {
-        batchPromises.push(setDoc(doc(db, 'projects', proj.id), proj));
-      }
+        // Seed Projects
+        for (const proj of SEED_PROJECTS) {
+          batchPromises.push(setDoc(doc(db, 'projects', proj.id), proj));
+        }
 
-      // Seed Announcements
-      for (const ann of SEED_ANNOUNCEMENTS) {
-        batchPromises.push(setDoc(doc(db, 'announcements', ann.id), ann));
+        // Seed Announcements
+        for (const ann of SEED_ANNOUNCEMENTS) {
+          batchPromises.push(setDoc(doc(db, 'announcements', ann.id), ann));
+        }
       }
 
       await Promise.all(batchPromises);
       console.log('Database Seeding Complete.');
+      
+      // Reload to reflect changes if we just seeded
+      if (window.location.pathname === '/login') {
+         // Optional: trigger a soft reload or state update if needed, currently handled by app refresh logic
+      }
     }
   } catch (error) {
     console.error("Error initializing database:", error);
@@ -457,14 +481,16 @@ export const addCollege = async (details: Partial<Omit<College, 'id' | 'status' 
     website: details.website || '',
     address: details.address || '',
     contactPhone: details.contactPhone || '',
-    logoUrl,
-    logoFileName,
+    // Strict schema compliance: Use empty string if no value provided
+    logoUrl: logoUrl || "",
+    logoFileName: logoFileName || "",
     status: 'Active',
     createdAt: new Date().toISOString(),
     id: docRef.id // Ensure ID is in document
   };
 
   // 3. Save to Firestore
+  // Uses setDoc with the determined docRef (which has the ID) to ensure path is /colleges/{uid}
   await setDoc(docRef, newCollege);
 
   await logActivity(null, 'COLLEGE_ADD', `Added new institution: ${newCollege.name}`, 'success');

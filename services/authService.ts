@@ -14,7 +14,7 @@ const mapUserDocsToAppUser = (authUser: any, docData: any): any => {
         role: docData.role || UserRole.STUDENT,
         avatar: docData.avatar || authUser.photoURL || `https://api.dicebear.com/7.x/avataaars/svg?seed=${authUser.uid}`,
         status: docData.status || 'Active',
-        collegeId: docData.collegeId || 'col_1',
+        collegeId: docData.collegeId || 'kWE1Ir8wlBnv31BdZyDQ',
         ...docData
     };
 };
@@ -37,7 +37,7 @@ const ensureFirestoreDoc = async (authUser: any, additionalData: any = {}) => {
             avatar: authUser.photoURL || `https://api.dicebear.com/7.x/avataaars/svg?seed=${authUser.uid}`,
             createdAt: new Date().toISOString(),
             status: 'Active',
-            collegeId: additionalData.collegeId || 'col_1',
+            collegeId: additionalData.collegeId || 'kWE1Ir8wlBnv31BdZyDQ',
             photoFileName: additionalData.photoFileName || null,
             ...additionalData
         };

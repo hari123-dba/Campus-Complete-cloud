@@ -67,7 +67,7 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
       // Auto-select the specific ID if available, otherwise first
       if (loadedColleges.length > 0) {
         if (!selectedCollege) {
-          const defaultCol = loadedColleges.find(c => c.id === '4Thk3nIJesDG7oPX3Jcg') || loadedColleges[0];
+          const defaultCol = loadedColleges.find(c => c.id === 'kWE1Ir8wlBnv31BdZyDQ') || loadedColleges[0];
           setSelectedCollege(defaultCol.id);
         }
       }
@@ -104,7 +104,7 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
   }, [activeTab, selectedCollege, showForgotPassword]);
 
   const handleDemoLogin = async (role: UserRole, email: string) => {
-    if (role !== UserRole.ADMIN && selectedCollege !== '4Thk3nIJesDG7oPX3Jcg') {
+    if (role !== UserRole.ADMIN && selectedCollege !== 'kWE1Ir8wlBnv31BdZyDQ') {
       setError('Quick Demo is only available for "Campus Complete Demo Univ"');
       return;
     }
@@ -511,7 +511,7 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
             <div className="space-y-4 animate-fade-in">
                 <div className="text-center mb-4">
                 <p className="text-xs text-slate-400">
-                    {selectedCollege === '4Thk3nIJesDG7oPX3Jcg' ? 'Tap any role below to auto-fill credentials' : 'Switch to "Campus Complete Demo Univ" for quick access (Admin is global)'}
+                    {selectedCollege === 'kWE1Ir8wlBnv31BdZyDQ' ? 'Tap any role below to auto-fill credentials' : 'Switch to "Campus Complete Demo Univ" for quick access (Admin is global)'}
                 </p>
                 </div>
                 {(Object.values(UserRole) as UserRole[]).map((role) => (
@@ -519,7 +519,7 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
                     key={role} 
                     role={role} 
                     onClick={handleDemoLogin}
-                    isLoading={isLoading || (selectedCollege !== '4Thk3nIJesDG7oPX3Jcg' && role !== UserRole.ADMIN)}
+                    isLoading={isLoading || (selectedCollege !== 'kWE1Ir8wlBnv31BdZyDQ' && role !== UserRole.ADMIN)}
                 />
                 ))}
             </div>
