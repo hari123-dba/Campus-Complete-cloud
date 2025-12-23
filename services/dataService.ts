@@ -2,10 +2,9 @@ import { Competition, CompetitionStatus, Project, ProjectPhase, Announcement, Us
 import { db, storage, auth } from '../lib/firebase';
 import { 
   collection, doc, getDocs, getDoc, addDoc, updateDoc, deleteDoc, 
-  query, where, orderBy, limit, setDoc, Timestamp 
+  query, where, orderBy, limit, setDoc, Timestamp, writeBatch
 } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
-import { deleteUser } from 'firebase/auth';
 
 // --- SEED DATA CONSTANTS ---
 const SEED_COLLEGES: College[] = [
@@ -18,8 +17,8 @@ const SEED_COLLEGES: College[] = [
     contactPhone: '555-0199',
     status: 'Active',
     createdAt: '2023-01-15T00:00:00.000Z',
-    logoUrl: '',
-    logoFileName: ''
+    logoUrl: 'https://images.unsplash.com/photo-1592280771190-3e2e4d571952?auto=format&fit=crop&w=100&h=100',
+    logoFileName: 'demo-univ.png'
   },
   { 
     id: 'H8IFKjuoSkrUtiDlJEFp', 
@@ -30,18 +29,6 @@ const SEED_COLLEGES: College[] = [
     contactPhone: '555-0500',
     status: 'Active',
     createdAt: new Date().toISOString(),
-    logoUrl: '',
-    logoFileName: ''
-  },
-  { 
-    id: 'col_2', 
-    name: 'Springfield Institute of Tech', 
-    emailId: 'springfield.edu', 
-    website: 'https://sit.edu',
-    address: '742 Evergreen Terrace, Springfield',
-    contactPhone: '555-0200',
-    status: 'Active',
-    createdAt: '2023-03-10T00:00:00.000Z',
     logoUrl: '',
     logoFileName: ''
   }
@@ -75,57 +62,115 @@ const SEED_USERS: User[] = [
   }
 ];
 
+const SEED_COMPETITIONS: Competition[] = [
+  {
+    id: 'comp_1',
+    title: 'National Innovation Hackathon',
+    description: 'A 48-hour challenge to build sustainable solutions for urban waste management using IoT and AI.',
+    status: CompetitionStatus.ONGOING,
+    date: 'Sept 15-17, 2024',
+    participants: 124,
+    bannerUrl: 'https://images.unsplash.com/photo-1504384308090-c894fdcc538d?auto=format&fit=crop&w=800&q=80'
+  },
+  {
+    id: 'comp_2',
+    title: 'Inter-University Robotics Cup',
+    description: 'Annual robotics competition focusing on autonomous navigation and swarm intelligence.',
+    status: CompetitionStatus.UPCOMING,
+    date: 'Oct 22, 2024',
+    participants: 45,
+    bannerUrl: 'https://images.unsplash.com/photo-1581092160562-40aa08e78837?auto=format&fit=crop&w=800&q=80'
+  }
+];
+
+const SEED_ANNOUNCEMENTS: Announcement[] = [
+  {
+    id: 'ann_1',
+    title: 'Welcome to Campus Complete',
+    content: 'We are thrilled to launch the new centralized project and competition management platform. Start building your teams today!',
+    targetRole: 'All',
+    date: new Date().toLocaleDateString()
+  },
+  {
+    id: 'ann_2',
+    title: 'Annual Research Grant Cycle Open',
+    content: 'Principals and HODs can now submit departmental research proposals for the 2024-25 funding cycle.',
+    targetRole: UserRole.PRINCIPAL,
+    date: new Date().toLocaleDateString()
+  }
+];
+
 /**
- * Initializes the database.
- * If offline, it handles the failure gracefully so the app shell still loads.
+ * Initializes the database with modular steps.
  */
-export const initializeDatabase = async () => {
+export const initializeDatabase = async (onProgress?: (step: number, label: string) => void) => {
   try {
-    const criticalIds = ['kWE1Ir8wlBnv31BdZyDQ', 'H8IFKjuoSkrUtiDlJEFp'];
-    
-    // Attempt to check for critical records
-    for (const id of criticalIds) {
-      const colRef = doc(db, 'colleges', id);
-      try {
-        const snap = await getDoc(colRef);
-        if (!snap.exists()) {
-          const seedData = SEED_COLLEGES.find(c => c.id === id);
-          if (seedData) {
-            console.log(`Seeding Golden Record: ${id}`);
-            await setDoc(colRef, seedData);
-          }
-        }
-      } catch (innerError: any) {
-        // If we are offline, getDoc will throw if the item isn't in cache.
-        // We catch this here so the loop can continue or exit cleanly.
-        if (innerError.code === 'unavailable' || innerError.message.includes('offline')) {
-          console.warn(`Database initialization: Client is offline. Skipping seeding for ID: ${id}`);
-          return; // Stop initialization attempt if network is totally unavailable
-        }
-        throw innerError;
-      }
+    const batch = writeBatch(db);
+
+    // Step 1: Institutions
+    if (onProgress) onProgress(1, 'Building Institutional Records');
+    for (const col of SEED_COLLEGES) {
+      const colRef = doc(db, 'colleges', col.id);
+      batch.set(colRef, col);
     }
 
-    const usersRef = collection(db, 'users');
-    const userSnapshot = await getDocs(query(usersRef, limit(1)));
-    if (userSnapshot.empty) {
-      console.log('Seeding initial users and content...');
-      const batchPromises = [];
-      for (const user of SEED_USERS) {
-        batchPromises.push(setDoc(doc(db, 'users', user.id), user));
-      }
-      for (const col of SEED_COLLEGES) {
-        if (!criticalIds.includes(col.id)) {
-           batchPromises.push(setDoc(doc(db, 'colleges', col.id), col));
-        }
-      }
-      await Promise.all(batchPromises);
+    // Step 2: Users
+    if (onProgress) onProgress(2, 'Provisioning Access Roles');
+    for (const user of SEED_USERS) {
+      const userRef = doc(db, 'users', user.id);
+      batch.set(userRef, user);
     }
+
+    // Step 3: Competitions & Announcements
+    if (onProgress) onProgress(3, 'Populating Global Events');
+    for (const comp of SEED_COMPETITIONS) {
+      const compRef = doc(db, 'competitions', comp.id);
+      batch.set(compRef, comp);
+    }
+    for (const ann of SEED_ANNOUNCEMENTS) {
+      const annRef = doc(db, 'announcements', ann.id);
+      batch.set(annRef, ann);
+    }
+
+    // Step 4: Sample Team & Project for Demo Student
+    if (onProgress) onProgress(4, 'Indexing Initial Content');
+    const teamId = 'team_sample_1';
+    const projId = 'proj_sample_1';
+    
+    const teamRef = doc(db, 'teams', teamId);
+    batch.set(teamRef, {
+      id: teamId,
+      name: 'Innovation Alchemists',
+      code: 'ALCHY1',
+      projectIds: [projId],
+      members: [{ 
+        userId: 'u_stu', 
+        name: 'Student User', 
+        role: 'Leader', 
+        avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Student' 
+      }]
+    });
+
+    const projRef = doc(db, 'projects', projId);
+    batch.set(projRef, {
+      id: projId,
+      title: 'Smart Solar Tracker',
+      description: 'Dual-axis solar tracking system for maximum efficiency in residential panels.',
+      teamName: 'Innovation Alchemists',
+      studentId: 'u_stu',
+      competitionId: 'comp_1',
+      phase: ProjectPhase.DEVELOPMENT,
+      score: 85,
+      lastUpdated: new Date().toISOString()
+    });
+
+    await batch.commit();
+    if (onProgress) onProgress(5, 'System Ready');
+    
+    await logActivity(null, 'SYS_INIT', 'Initial database seeding completed successfully', 'success');
   } catch (error: any) {
-    // Only log if it's not a standard offline warning
-    if (!error.message?.includes('offline')) {
-      console.error("Error initializing database:", error);
-    }
+    console.error("Error initializing database:", error);
+    throw error;
   }
 };
 
